@@ -1,12 +1,13 @@
 # rwfury
 
-Python library for reading and writing GTA RenderWare **DFF** (3D model) and **TXD** (texture dictionary) files. Supports GTA III, Vice City, and San Andreas.
+Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), and **IMG** (archive) files. Supports GTA III, Vice City, and San Andreas.
 
 ## Features
 
 - **DFF parsing** with full plugin support: BinMesh, Skin, HAnim, 2dfx, Material Effects, Night Colors, Collision, Specular/Reflection materials
 - **DFF writing** back to binary (round-trip)
 - **TXD parsing** with DDS export and raw RGBA decoding
+- **IMG archives**: read/write v1 (GTA III/VC) and v2 (San Andreas), extract files, parse DFF/TXD directly from memory
 - **Version-aware**: handles RW 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
 - **GenericMesh**: format-agnostic mesh representation with flat arrays and byte-packing helpers for easy porting to glTF, FBX, or any custom format
 - Zero external dependencies (pure Python, stdlib only)
@@ -20,6 +21,32 @@ pip install rwfury
 Requires Python 3.10+. No external dependencies.
 
 ## Quick start
+
+### Read files from an IMG archive
+
+```python
+from rwfury import Img, Dff, Txd
+
+# Open an IMG (auto-detects v1 or v2)
+img = Img.from_file("gta3.img")
+
+# List contents
+print(f"{len(img.entries)} files")
+for name in img.list_files()[:10]:
+    print(f"  {name}")
+
+# Find a file (case-insensitive)
+entry = img.find("cop.dff")
+print(f"{entry.name}: {entry.size} bytes")
+
+# Parse DFF/TXD directly from IMG (no temp files)
+dff = Dff.from_bytes(img.read("cop.dff"))
+txd = Txd.from_bytes(img.read("cop.txd"))
+
+# Extract files to disk
+img.extract("cop.dff", "output/")       # single file
+img.extract_all("output/")              # everything
+```
 
 ### Parse a DFF and extract meshes
 
@@ -93,6 +120,19 @@ dff.frames[0].name = "renamed_frame"
 dff.to_file("modified.dff")
 ```
 
+### Create a new IMG archive
+
+```python
+from rwfury import Img
+
+# Build a v2 IMG from files
+files = {
+    "model.dff": open("model.dff", "rb").read(),
+    "texture.txd": open("texture.txd", "rb").read(),
+}
+Img.create_v2(files, "output.img")
+```
+
 ### Access low-level data
 
 ```python
@@ -140,9 +180,11 @@ if dff.collision:
 
 | Class | Description |
 |-------|-------------|
-| `Dff` | DFF file parser/writer. `from_file(path)`, `to_file(path)`, `get_meshes()`, `to_generic_meshes()` |
-| `Txd` | TXD file parser. `from_file(path)`, `export_to_dds(folder)` |
+| `Dff` | DFF parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `get_meshes()`, `to_generic_meshes()` |
+| `Txd` | TXD parser. `from_file(path)`, `from_bytes(data)`, `export_to_dds(folder)` |
 | `TxdTexture` | Single texture entry. `to_rgba()` decodes any format to raw RGBA bytes |
+| `Img` | IMG archive. `from_file(path)`, `read(name)`, `find(name)`, `extract()`, `extract_all()`, `create_v2()` |
+| `ImgEntry` | Archive entry with `name`, `offset`, `size` |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
 ### DFF data classes
@@ -177,13 +219,15 @@ if dff.collision:
 
 ## Supported formats
 
-| Game | RW Version | DFF | TXD |
-|------|-----------|-----|-----|
-| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export |
-| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export |
+| Game | RW Version | DFF | TXD | IMG |
+|------|-----------|-----|-----|-----|
+| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) |
+| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
+
+IMG v1 uses separate `.dir` + `.img` files. IMG v2 uses a single `.img` file with `VER2` header.
 
 ## License
 
