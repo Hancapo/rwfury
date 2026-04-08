@@ -1,0 +1,22 @@
+# Test files
+*.dff
+*.txd
+*.dds
+gta3/
+gtavc/
+test_txd_*/
+test_obj_output/
+
+# C++ reference
+dffapi-cpp-master/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Claude
+.claude/
