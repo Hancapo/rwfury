@@ -1,4 +1,4 @@
-"""dffapi - Python API for GTA RenderWare DFF and TXD files."""
+"""rwfury - Python API for GTA RenderWare DFF and TXD files."""
 
 from .dff import (
     Dff, Mesh,
