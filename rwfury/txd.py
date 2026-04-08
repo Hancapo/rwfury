@@ -125,6 +125,15 @@ class Txd:
             txd._parse(reader)
         return txd
 
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Txd:
+        """Parse a TXD from raw bytes (e.g. read from an IMG archive)."""
+        import io
+        txd = cls()
+        reader = RwBinaryReader(io.BytesIO(data))
+        txd._parse(reader)
+        return txd
+
     def _parse(self, reader: RwBinaryReader):
         header = reader.read_chunk_header()
         if header.id != RW_TEXTURE_DICTIONARY:

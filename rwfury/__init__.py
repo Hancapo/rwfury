@@ -9,6 +9,7 @@ from .dff import (
     Effect2dfxEntry, Effect2dfxLight, Effect2dfxParticle,
 )
 from .txd import Txd, TxdTexture
+from .img import Img, ImgEntry
 from .generic_mesh import GenericMesh
 from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
 
@@ -20,6 +21,7 @@ __all__ = [
     "SkinPLG", "HAnimPLG", "HAnimBone",
     "Effect2dfxEntry", "Effect2dfxLight", "Effect2dfxParticle",
     "Txd", "TxdTexture",
+    "Img", "ImgEntry",
     "GenericMesh",
     "ChunkHeader", "RwBinaryReader", "RwBinaryWriter",
 ]

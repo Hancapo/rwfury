@@ -247,6 +247,15 @@ class Dff:
             dff._parse(reader)
         return dff
 
+    @classmethod
+    def from_bytes(cls, data: bytes) -> Dff:
+        """Parse a DFF from raw bytes (e.g. read from an IMG archive)."""
+        import io
+        dff = cls()
+        reader = RwBinaryReader(io.BytesIO(data))
+        dff._parse(reader)
+        return dff
+
     def get_meshes(self) -> list[dict]:
         """Extract mesh data grouped by atomic/material.
 
