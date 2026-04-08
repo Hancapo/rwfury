@@ -13,7 +13,11 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model) and **T
 
 ## Installation
 
-Copy the `rwfury/` folder into your project, or add the parent directory to your Python path.
+```bash
+pip install rwfury
+```
+
+Requires Python 3.10+. No external dependencies.
 
 ## Quick start
 
