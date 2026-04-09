@@ -1,6 +1,6 @@
 # rwfury
 
-Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), and **IMG** (archive) files. Supports GTA III, Vice City, and San Andreas.
+Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), and **COL** (collision) files. Supports GTA III, Vice City, and San Andreas.
 
 ## Features
 
@@ -8,8 +8,11 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 - **DFF writing** back to binary (round-trip)
 - **TXD parsing** with DDS export and raw RGBA decoding
 - **IMG archives**: read/write v1 (GTA III/VC) and v2 (San Andreas), extract files, parse DFF/TXD directly from memory
+- **COL parsing/writing** for standalone collision files: COL1, COL2, and COL3, including spheres, boxes, face groups, and shadow meshes
+- **Named collision materials** via `ColMaterial` enum for readable COL surface IDs
 - **Version-aware**: handles RW 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
 - **GenericMesh**: format-agnostic mesh representation with flat arrays and byte-packing helpers for easy porting to glTF, FBX, or any custom format
+- **BinMesh-aware generic export**: `to_generic_meshes()` preserves material splits from BinMesh, including triangle strips
 - Zero external dependencies (pure Python, stdlib only)
 
 ## Installation
@@ -87,6 +90,38 @@ for mesh in dff.to_generic_meshes():
     if mesh.has_skinning:
         bi = mesh.bone_indices_as_bytes()   # uint8, 4 per vertex
         bw = mesh.bone_weights_as_bytes()   # float32, 4 per vertex
+```
+
+### Read and write a COL collision file
+
+```python
+from rwfury import Col, ColMaterial
+
+col = Col.from_file("model.col")
+
+for model in col.models:
+    print(model.name, model.version)
+    print(f"{len(model.spheres)} spheres, {len(model.boxes)} boxes")
+    print(f"{len(model.vertices)} verts, {len(model.faces)} faces")
+
+    if model.faces:
+        face = model.faces[0]
+        print(face.material, ColMaterial(face.material).label)
+
+col.to_file("roundtrip.col")
+```
+
+### Parse embedded collision from a DFF
+
+```python
+from rwfury import Dff
+
+dff = Dff.from_file("model.dff")
+
+if dff.collision:
+    col_model = dff.collision.parse()
+    if col_model:
+        print(col_model.name, len(col_model.faces))
 ```
 
 ### Extract textures from a TXD
@@ -172,6 +207,9 @@ for geom in dff.geometries:
 # Collision data
 if dff.collision:
     print(f"Embedded collision: {len(dff.collision.raw)} bytes")
+    parsed = dff.collision.parse()
+    if parsed:
+        print(f"  Parsed COL model: {parsed.name}")
 ```
 
 ## API reference
@@ -185,6 +223,9 @@ if dff.collision:
 | `TxdTexture` | Single texture entry. `to_rgba()` decodes any format to raw RGBA bytes |
 | `Img` | IMG archive. `from_file(path)`, `read(name)`, `find(name)`, `extract()`, `extract_all()`, `create_v2()` |
 | `ImgEntry` | Archive entry with `name`, `offset`, `size` |
+| `Col` | COL parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()` |
+| `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
+| `ColMaterial` | Named `IntEnum` for COL surface material IDs |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
 ### DFF data classes
@@ -201,6 +242,17 @@ if dff.collision:
 | `HAnimPLG` | Skeleton hierarchy with bone IDs and flags |
 | `Effect2dfxEntry` | 2dfx effect (lights, particles, etc.) with position and typed data |
 | `CollisionData` | Raw embedded COL data blob |
+
+### COL data classes
+
+| Class | Description |
+|-------|-------------|
+| `ColBounds` | Bounding sphere + AABB data |
+| `ColSurface` | Collision surface properties: material, flag, brightness, light |
+| `ColSphere` | Collision sphere primitive |
+| `ColBox` | Collision box primitive |
+| `ColFace` | Collision triangle face with material/light |
+| `ColFaceGroup` | Spatial grouping metadata for COL2/3 |
 
 ### GenericMesh properties and methods
 
@@ -219,11 +271,11 @@ if dff.collision:
 
 ## Supported formats
 
-| Game | RW Version | DFF | TXD | IMG |
-|------|-----------|-----|-----|-----|
-| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) |
-| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) |
+| Game | RW Version | DFF | TXD | IMG | COL |
+|------|-----------|-----|-----|-----|-----|
+| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) |
+| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
 

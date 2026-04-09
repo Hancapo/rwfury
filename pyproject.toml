@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rwfury"
-version = "0.2.0"
-description = "Python library for reading and writing GTA RenderWare DFF, TXD, and IMG files"
+version = "0.3.0"
+description = "Python library for reading and writing GTA RenderWare DFF, TXD, IMG, and COL files"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Hancapo" },
 ]
-keywords = ["gta", "renderware", "dff", "txd", "img", "san-andreas", "vice-city", "gta3"]
+keywords = ["gta", "renderware", "dff", "txd", "img", "col", "collision", "san-andreas", "vice-city", "gta3"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
