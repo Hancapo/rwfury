@@ -190,6 +190,17 @@ class MorphTarget:
 class CollisionData:
     raw: bytes = b""  # Raw COL data blob
 
+    def parse(self):
+        """Parse the raw collision bytes into a ColModel.
+
+        Returns a ColModel if the data is valid, None otherwise.
+        """
+        if not self.raw:
+            return None
+        from .col import Col
+        col = Col.from_bytes(self.raw)
+        return col.models[0] if col.models else None
+
 
 @dataclass
 class DffGeometry:
@@ -331,70 +342,120 @@ class Dff:
                 p[0], p[1], p[2], 1.0,
             ]
 
-            for mat_idx, material in enumerate(geom.materials):
-                mat_tris = [t for t in geom.triangles if t[3] == mat_idx]
-                if not mat_tris:
-                    continue
+            if geom.bin_mesh and geom.bin_mesh.splits:
+                for split in geom.bin_mesh.splits:
+                    mesh = self._build_generic_mesh_from_indices(
+                        geom=geom,
+                        frame=frame,
+                        transform=xform,
+                        material_index=split.material_index,
+                        source_indices=self._expand_bin_mesh_indices(
+                            split.indices, geom.bin_mesh.flags
+                        ),
+                    )
+                    if mesh:
+                        results.append(mesh)
+                continue
 
-                used = sorted({i for a, b, c, _ in mat_tris for i in (a, b, c)})
-                remap = {old: new for new, old in enumerate(used)}
-
-                # Flatten positions
-                positions: list[float] = []
-                for i in used:
-                    positions.extend(geom.vertices[i])
-
-                # Flatten normals
-                normals: list[float] = []
-                if geom.normals:
-                    for i in used:
-                        normals.extend(geom.normals[i])
-
-                # Flatten texcoords per UV set
-                texcoords: list[list[float]] = []
-                for uv_layer in geom.texcoord_sets:
-                    flat_uv: list[float] = []
-                    for i in used:
-                        flat_uv.extend(uv_layer[i])
-                    texcoords.append(flat_uv)
-
-                # Flatten vertex colors
-                colors: list[int] = []
-                if geom.vertex_colors:
-                    for i in used:
-                        colors.extend(geom.vertex_colors[i])
-
-                # Remap indices
-                indices = [remap[i] for a, b, c, _ in mat_tris for i in (a, b, c)]
-
-                # Skinning data
-                bone_idx_flat: list[int] = []
-                bone_wt_flat: list[float] = []
-                if geom.skin:
-                    for i in used:
-                        bone_idx_flat.extend(geom.skin.bone_indices[i])
-                        bone_wt_flat.extend(geom.skin.weights[i])
-
-                results.append(GenericMesh(
-                    name=frame.name,
-                    material_index=mat_idx,
-                    positions=positions,
-                    normals=normals,
-                    texcoords=texcoords,
-                    colors=colors,
-                    indices=indices,
-                    texture_name=material.texture_name,
-                    mask_name=material.mask_name,
-                    diffuse_color=material.color,
-                    ambient=material.ambient,
-                    diffuse=material.diffuse,
-                    specular=material.specular,
+            for mat_idx, _material in enumerate(geom.materials):
+                source_indices = [
+                    i for a, b, c, tri_mat in geom.triangles
+                    if tri_mat == mat_idx
+                    for i in (a, b, c)
+                ]
+                mesh = self._build_generic_mesh_from_indices(
+                    geom=geom,
+                    frame=frame,
                     transform=xform,
-                    bone_indices=bone_idx_flat,
-                    bone_weights=bone_wt_flat,
-                ))
+                    material_index=mat_idx,
+                    source_indices=source_indices,
+                )
+                if mesh:
+                    results.append(mesh)
 
         return results
+
+    @staticmethod
+    def _expand_bin_mesh_indices(indices: list[int], flags: int) -> list[int]:
+        if flags != 1:
+            return list(indices)
+
+        triangles: list[int] = []
+        for i in range(len(indices) - 2):
+            a, b, c = indices[i], indices[i + 1], indices[i + 2]
+            if a == b or b == c or a == c:
+                continue
+            if i % 2:
+                triangles.extend((b, a, c))
+            else:
+                triangles.extend((a, b, c))
+        return triangles
+
+    @staticmethod
+    def _build_generic_mesh_from_indices(
+        geom: DffGeometry,
+        frame: DffFrame,
+        transform: list[float],
+        material_index: int,
+        source_indices: list[int],
+    ) -> GenericMesh | None:
+        if material_index < 0 or material_index >= len(geom.materials):
+            return None
+        if not source_indices:
+            return None
+        if any(i < 0 or i >= len(geom.vertices) for i in source_indices):
+            return None
+
+        material = geom.materials[material_index]
+        used = sorted(set(source_indices))
+        remap = {old: new for new, old in enumerate(used)}
+
+        positions: list[float] = []
+        for i in used:
+            positions.extend(geom.vertices[i])
+
+        normals: list[float] = []
+        if geom.normals:
+            for i in used:
+                normals.extend(geom.normals[i])
+
+        texcoords: list[list[float]] = []
+        for uv_layer in geom.texcoord_sets:
+            flat_uv: list[float] = []
+            for i in used:
+                flat_uv.extend(uv_layer[i])
+            texcoords.append(flat_uv)
+
+        colors: list[int] = []
+        if geom.vertex_colors:
+            for i in used:
+                colors.extend(geom.vertex_colors[i])
+
+        bone_idx_flat: list[int] = []
+        bone_wt_flat: list[float] = []
+        if geom.skin:
+            for i in used:
+                bone_idx_flat.extend(geom.skin.bone_indices[i])
+                bone_wt_flat.extend(geom.skin.weights[i])
+
+        return GenericMesh(
+            name=frame.name,
+            material_index=material_index,
+            positions=positions,
+            normals=normals,
+            texcoords=texcoords,
+            colors=colors,
+            indices=[remap[i] for i in source_indices],
+            texture_name=material.texture_name,
+            mask_name=material.mask_name,
+            diffuse_color=material.color,
+            ambient=material.ambient,
+            diffuse=material.diffuse,
+            specular=material.specular,
+            transform=transform,
+            bone_indices=bone_idx_flat,
+            bone_weights=bone_wt_flat,
+        )
 
     def to_file(self, path: str):
         """Write this DFF back to a binary file."""

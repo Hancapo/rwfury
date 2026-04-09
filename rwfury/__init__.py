@@ -10,6 +10,8 @@ from .dff import (
 )
 from .txd import Txd, TxdTexture
 from .img import Img, ImgEntry
+from .col import Col, ColModel, ColSphere, ColBox, ColFace, ColBounds, ColSurface, ColFaceGroup
+from .col_materials import ColMaterial
 from .generic_mesh import GenericMesh
 from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
 
@@ -22,6 +24,8 @@ __all__ = [
     "Effect2dfxEntry", "Effect2dfxLight", "Effect2dfxParticle",
     "Txd", "TxdTexture",
     "Img", "ImgEntry",
+    "Col", "ColModel", "ColSphere", "ColBox", "ColFace",
+    "ColBounds", "ColSurface", "ColFaceGroup", "ColMaterial",
     "GenericMesh",
     "ChunkHeader", "RwBinaryReader", "RwBinaryWriter",
 ]
