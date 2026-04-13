@@ -1,11 +1,11 @@
 """rwfury - Python API for GTA RenderWare DFF and TXD files."""
 
-from .dff import (
-    Dff, Mesh,
-    DffGeometry, DffMaterial, DffFrame, DffAtomic,
-    DffLight, DffLightFlags, DffLightType,
-    MorphTarget, CollisionData,
-    BinMeshPLG, BinMeshSplit,
+from .dff import Dff
+from .dff_parts.models import (
+    BinMeshPLG, BinMeshSplit, CollisionData,
+    DffAtomic, DffFrame, DffGeometry, DffLight,
+    DffLightFlags, DffLightType, DffMaterial,
+    Mesh, MorphTarget,
     SkinPLG, HAnimPLG, HAnimBone,
     Effect2dfxEntry, Effect2dfxLight, Effect2dfxParticle,
 )
