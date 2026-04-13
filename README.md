@@ -1,6 +1,6 @@
 # rwfury
 
-Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), and **COL** (collision) files. Supports GTA III, Vice City, and San Andreas.
+Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), **COL** (collision), and GTA SA **nodes*.dat** path files. Supports GTA III, Vice City, and San Andreas.
 
 ## Features
 
@@ -11,6 +11,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 - **IMG archives**: read/write v1 (GTA III/VC) and v2 (San Andreas), extract files, parse DFF/TXD directly from memory
 - **COL parsing/writing** for standalone collision files: COL1, COL2, and COL3, including spheres, boxes, face groups, and shadow meshes
 - **Named collision materials** via `ColMaterial` enum for readable COL surface IDs
+- **GTA SA path files**: read/write `nodes*.dat` vehicle/ped graph nodes, navi nodes, links, navi links, link lengths, and intersection flags
 - **Version-aware**: handles RW 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
 - **GenericMesh**: format-agnostic mesh representation with flat arrays and byte-packing helpers for easy porting to glTF, FBX, or any custom format
 - **BinMesh-aware generic export**: `to_generic_meshes()` preserves material splits from BinMesh, including triangle strips
@@ -123,6 +124,29 @@ if dff.collision:
     col_model = dff.collision.parse()
     if col_model:
         print(col_model.name, len(col_model.faces))
+```
+
+### Read and write GTA SA path nodes
+
+```python
+from rwfury import SaPaths, PathNodeFlag, PathTrafficLevel
+
+paths = SaPaths.from_file("nodes5.dat")
+print(paths.area_id, paths.node_count, paths.link_count)
+print(SaPaths.area_origin(paths.area_id))
+
+for node in paths.vehicle_nodes[:10]:
+    print(node.node_id, node.position, node.link_count, node.traffic_level)
+    for link in paths.links_for_node(node):
+        print(" ->", link.link.area_id, link.link.node_id, "length", link.length)
+
+# Bitfield helpers keep the raw flags editable without manual masks.
+node = paths.vehicle_nodes[0]
+node.traffic_level = PathTrafficLevel.LOW
+node.flags |= PathNodeFlag.PARKING
+node.spawn_probability = 10
+
+paths.to_file("nodes5_roundtrip.dat")
 ```
 
 ### Extract textures from a TXD
@@ -260,6 +284,7 @@ dff.add_spot_light(
 | `Col` | COL parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()` |
 | `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
 | `ColMaterial` | Named `IntEnum` for COL surface material IDs |
+| `SaPaths` / `SaPathFile` | GTA SA `nodes*.dat` parser/writer with section-aware helpers |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
 ### DFF data classes
@@ -291,6 +316,20 @@ dff.add_spot_light(
 | `ColFace` | Collision triangle face with material/light |
 | `ColFaceGroup` | Spatial grouping metadata for COL2/3 |
 
+### GTA SA path data classes
+
+| Class | Description |
+|-------|-------------|
+| `SaPathFile` / `SaPaths` | One `nodes*.dat` file with vehicle nodes, ped nodes, navi nodes, links, filler, link lengths, and intersection flags |
+| `PathNode` | Section 1 graph node with scaled XYZ position and helpers for link count, traffic level, spawn probability, and behavior flags |
+| `NaviNode` | Section 2 vehicle navi node with scaled XY position, normalized direction, lane counts, traffic light behavior, and train crossing flag |
+| `PathLink` | Section 3 adjacent path node reference |
+| `NaviLink` | Section 5 packed navi node reference with 6-bit area and 10-bit node ID helpers |
+| `PathLinkRecord` | Combined high-level view of one link across sections 3, 5, 6, and 7 |
+| `PathNodeFlag` | Named path node behavior flags such as boats, emergency-only, highway, parking, and road blocks |
+| `PathTrafficLevel` | Named traffic levels: full, high, medium, low |
+| `PathIntersectionFlag` | Section 7 road-cross and pedestrian-traffic-light flags |
+
 ### GenericMesh properties and methods
 
 | Member | Description |
@@ -308,11 +347,11 @@ dff.add_spot_light(
 
 ## Supported formats
 
-| Game | RW Version | DFF | TXD | IMG | COL |
-|------|-----------|-----|-----|-----|-----|
-| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) |
-| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) |
+| Game | RW Version | DFF | TXD | IMG | COL | Paths |
+|------|-----------|-----|-----|-----|-----|-------|
+| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - |
+| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | `nodes*.dat` (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
 
