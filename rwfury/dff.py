@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
+from enum import IntEnum, IntFlag
+from math import acos, cos, degrees, radians
 
 from .generic_mesh import GenericMesh
 
@@ -20,6 +22,7 @@ from .rwbinary import (
     RW_FRAME_LIST,
     RW_GEOMETRY,
     RW_CLUMP,
+    RW_LIGHT,
     RW_ATOMIC,
     RW_GEOMETRY_LIST,
     RW_FRAME_NAME,
@@ -237,6 +240,136 @@ class DffAtomic:
     flags: int = 0
 
 
+class DffLightFlags(IntFlag):
+    """RenderWare light scope flags."""
+    SCENE = 0x01
+    WORLD = 0x02
+
+
+class DffLightType(IntEnum):
+    """RenderWare light source types."""
+    DIRECTIONAL = 0x01
+    AMBIENT = 0x02
+    POINT = 0x80
+    SPOT = 0x81
+    SPOT_SOFT = 0x82
+
+
+@dataclass
+class DffLight:
+    """RenderWare real-time light attached to a frame."""
+    frame_index: int = 0
+    radius: float = 0.0
+    color: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    cone_angle: float = 0.0  # Direction angle, stored as 1 - cos(alpha).
+    flags: int | DffLightFlags = 0
+    light_type: int | DffLightType = 0
+    extension_data: bytes = b""
+    extra_chunks: list[tuple[int, bytes]] = field(default_factory=list)
+
+    @property
+    def flags_enum(self) -> DffLightFlags:
+        return DffLightFlags(self.flags)
+
+    @property
+    def type_enum(self) -> DffLightType | None:
+        try:
+            return DffLightType(self.light_type)
+        except ValueError:
+            return None
+
+    @property
+    def type_name(self) -> str:
+        light_type = self.type_enum
+        return light_type.name if light_type else f"UNKNOWN_{int(self.light_type):#x}"
+
+    @property
+    def affects_scene(self) -> bool:
+        return bool(self.flags_enum & DffLightFlags.SCENE)
+
+    @property
+    def affects_world(self) -> bool:
+        return bool(self.flags_enum & DffLightFlags.WORLD)
+
+    @property
+    def spot_angle_radians(self) -> float:
+        return acos(max(-1.0, min(1.0, 1.0 - self.cone_angle)))
+
+    @property
+    def spot_angle_degrees(self) -> float:
+        return degrees(self.spot_angle_radians)
+
+    def set_spot_angle_radians(self, value: float):
+        self.cone_angle = 1.0 - cos(value)
+
+    def set_spot_angle_degrees(self, value: float):
+        self.set_spot_angle_radians(radians(value))
+
+    @classmethod
+    def ambient(
+        cls,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return cls(
+            frame_index=frame_index,
+            color=color,
+            flags=flags,
+            light_type=DffLightType.AMBIENT,
+        )
+
+    @classmethod
+    def directional(
+        cls,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return cls(
+            frame_index=frame_index,
+            color=color,
+            flags=flags,
+            light_type=DffLightType.DIRECTIONAL,
+        )
+
+    @classmethod
+    def point(
+        cls,
+        radius: float,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return cls(
+            frame_index=frame_index,
+            radius=radius,
+            color=color,
+            flags=flags,
+            light_type=DffLightType.POINT,
+        )
+
+    @classmethod
+    def spot(
+        cls,
+        radius: float,
+        angle_degrees: float,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        soft: bool = False,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        light = cls(
+            frame_index=frame_index,
+            radius=radius,
+            color=color,
+            flags=flags,
+            light_type=DffLightType.SPOT_SOFT if soft else DffLightType.SPOT,
+        )
+        light.set_spot_angle_degrees(angle_degrees)
+        return light
+
+
 # ---------------------------------------------------------------------------
 # Main DFF class
 # ---------------------------------------------------------------------------
@@ -248,6 +381,7 @@ class Dff:
         self.frames: list[DffFrame] = []
         self.geometries: list[DffGeometry] = []
         self.atomics: list[DffAtomic] = []
+        self.lights: list[DffLight] = []
         self.collision: CollisionData | None = None
         self.rw_version: int = 0
 
@@ -266,6 +400,85 @@ class Dff:
         reader = RwBinaryReader(io.BytesIO(data))
         dff._parse(reader)
         return dff
+
+    def get_light_frame(self, light: DffLight) -> DffFrame | None:
+        if 0 <= light.frame_index < len(self.frames):
+            return self.frames[light.frame_index]
+        return None
+
+    def iter_lights_with_frames(self):
+        for light in self.lights:
+            yield light, self.get_light_frame(light)
+
+    def get_lights(self) -> list[dict]:
+        """Return real RenderWare lights with resolved frame metadata."""
+        return [
+            {
+                "light": light,
+                "frame": frame,
+                "frame_name": frame.name if frame else "",
+                "type": light.type_name,
+                "flags": light.flags_enum,
+                "radius": light.radius,
+                "color": light.color,
+                "spot_angle_degrees": light.spot_angle_degrees,
+                "affects_scene": light.affects_scene,
+                "affects_world": light.affects_world,
+            }
+            for light, frame in self.iter_lights_with_frames()
+        ]
+
+    def add_light(self, light: DffLight) -> DffLight:
+        self.lights.append(light)
+        return light
+
+    def add_ambient_light(
+        self,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return self.add_light(DffLight.ambient(color=color, frame_index=frame_index, flags=flags))
+
+    def add_directional_light(
+        self,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return self.add_light(DffLight.directional(color=color, frame_index=frame_index, flags=flags))
+
+    def add_point_light(
+        self,
+        radius: float,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return self.add_light(DffLight.point(
+            radius=radius,
+            color=color,
+            frame_index=frame_index,
+            flags=flags,
+        ))
+
+    def add_spot_light(
+        self,
+        radius: float,
+        angle_degrees: float,
+        color: tuple[float, float, float] = (1.0, 1.0, 1.0),
+        frame_index: int = 0,
+        soft: bool = False,
+        flags: int | DffLightFlags = DffLightFlags.SCENE,
+    ) -> DffLight:
+        return self.add_light(DffLight.spot(
+            radius=radius,
+            angle_degrees=angle_degrees,
+            color=color,
+            frame_index=frame_index,
+            soft=soft,
+            flags=flags,
+        ))
 
     def get_meshes(self) -> list[dict]:
         """Extract mesh data grouped by atomic/material.
@@ -477,7 +690,7 @@ class Dff:
         assert struct_h.id == RW_STRUCT
         _num_atomics = reader.read_u32()
         if struct_h.size >= 12:
-            reader.read_u32()  # num_lights
+            _num_lights = reader.read_u32()
             reader.read_u32()  # num_cameras
         elif struct_h.size > 4:
             reader.skip(struct_h.size - 4)
@@ -492,6 +705,8 @@ class Dff:
                 self._parse_geometry_list(reader, child_end)
             elif child.id == RW_ATOMIC:
                 self._parse_atomic(reader, child_end)
+            elif child.id == RW_LIGHT:
+                self.lights.append(self._parse_light(reader, child_end))
             elif child.id == RW_EXTENSION:
                 self._parse_clump_extension(reader, child_end)
             else:
@@ -506,6 +721,36 @@ class Dff:
                 self.collision = CollisionData(raw=reader.read_bytes(plugin.size))
             else:
                 reader.seek(plugin_end)
+
+    # --- Lights ---
+
+    def _parse_light(self, reader: RwBinaryReader, chunk_end: int) -> DffLight:
+        struct_h = reader.read_chunk_header()
+        assert struct_h.id == RW_STRUCT
+        struct_end = reader.tell() + struct_h.size
+
+        light = DffLight()
+        if struct_h.size >= 28:
+            light.frame_index = reader.read_u32()
+            light.radius = reader.read_f32()
+            light.color = (reader.read_f32(), reader.read_f32(), reader.read_f32())
+            light.cone_angle = reader.read_f32()
+            light.flags = reader.read_u16()
+            light.light_type = reader.read_u16()
+
+        if reader.tell() < struct_end:
+            reader.seek(struct_end)
+
+        while reader.tell() < chunk_end:
+            child = reader.read_chunk_header()
+            child_end = reader.tell() + child.size
+
+            if child.id == RW_EXTENSION:
+                light.extension_data = reader.read_bytes(child.size)
+            else:
+                light.extra_chunks.append((child.id, reader.read_bytes(child.size)))
+
+        return light
 
     # --- Frame List ---
 
@@ -1001,7 +1246,7 @@ class Dff:
         body_w = RwBinaryWriter(body_stream)
 
         # Clump struct
-        struct_data = struct.pack("<III", len(self.atomics), 0, 0)
+        struct_data = struct.pack("<III", len(self.atomics), len(self.lights), 0)
         body_w.write_chunk_header(RW_STRUCT, len(struct_data), ver)
         body_w.write_bytes(struct_data)
 
@@ -1014,6 +1259,10 @@ class Dff:
         # Atomics
         for atomic in self.atomics:
             self._write_atomic(body_w, ver, atomic)
+
+        # Lights
+        for light in self.lights:
+            self._write_light(body_w, ver, light)
 
         # Clump extension
         ext_stream = io.BytesIO()
@@ -1028,6 +1277,34 @@ class Dff:
         # Write clump header + body
         body_data = body_stream.getvalue()
         w.write_chunk_header(RW_CLUMP, len(body_data), ver)
+        w.write_bytes(body_data)
+
+    def _write_light(self, w: RwBinaryWriter, ver: int, light: DffLight):
+        import io
+
+        body_stream = io.BytesIO()
+        bw = RwBinaryWriter(body_stream)
+
+        r, g, b = light.color
+        struct_data = struct.pack(
+            "<IfffffHH",
+            light.frame_index,
+            light.radius,
+            r, g, b,
+            light.cone_angle,
+            int(light.flags),
+            int(light.light_type),
+        )
+        bw.write_chunk_header(RW_STRUCT, len(struct_data), ver)
+        bw.write_bytes(struct_data)
+        bw.write_chunk_header(RW_EXTENSION, len(light.extension_data), ver)
+        bw.write_bytes(light.extension_data)
+        for chunk_id, data in light.extra_chunks:
+            bw.write_chunk_header(chunk_id, len(data), ver)
+            bw.write_bytes(data)
+
+        body_data = body_stream.getvalue()
+        w.write_chunk_header(RW_LIGHT, len(body_data), ver)
         w.write_bytes(body_data)
 
     def _write_frame_list(self, w: RwBinaryWriter, ver: int):

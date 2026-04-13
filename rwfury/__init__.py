@@ -3,6 +3,7 @@
 from .dff import (
     Dff, Mesh,
     DffGeometry, DffMaterial, DffFrame, DffAtomic,
+    DffLight, DffLightFlags, DffLightType,
     MorphTarget, CollisionData,
     BinMeshPLG, BinMeshSplit,
     SkinPLG, HAnimPLG, HAnimBone,
@@ -18,6 +19,7 @@ from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
 __all__ = [
     "Dff", "Mesh",
     "DffGeometry", "DffMaterial", "DffFrame", "DffAtomic",
+    "DffLight", "DffLightFlags", "DffLightType",
     "MorphTarget", "CollisionData",
     "BinMeshPLG", "BinMeshSplit",
     "SkinPLG", "HAnimPLG", "HAnimBone",

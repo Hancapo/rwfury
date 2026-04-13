@@ -6,6 +6,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 
 - **DFF parsing** with full plugin support: BinMesh, Skin, HAnim, 2dfx, Material Effects, Night Colors, Collision, Specular/Reflection materials
 - **DFF writing** back to binary (round-trip)
+- **DFF real-time lights**: read/write RenderWare `RW_LIGHT` chunks attached to frames
 - **TXD parsing** with DDS export and raw RGBA decoding
 - **IMG archives**: read/write v1 (GTA III/VC) and v2 (San Andreas), extract files, parse DFF/TXD directly from memory
 - **COL parsing/writing** for standalone collision files: COL1, COL2, and COL3, including spheres, boxes, face groups, and shadow meshes
@@ -210,6 +211,39 @@ if dff.collision:
     parsed = dff.collision.parse()
     if parsed:
         print(f"  Parsed COL model: {parsed.name}")
+
+# RenderWare real-time lights, distinct from Rockstar 2dfx light effects
+for light, frame in dff.iter_lights_with_frames():
+    frame_name = frame.name if frame else ""
+    print(frame_name, light.type_name, light.radius, light.color)
+    print(light.flags_enum, light.affects_scene, light.affects_world)
+    print(f"spot angle: {light.spot_angle_degrees:.1f} degrees")
+
+# Or use high-level dictionaries.
+for entry in dff.get_lights():
+    print(entry["frame_name"], entry["type"], entry["color"])
+```
+
+### Create RenderWare DFF lights
+
+```python
+from rwfury import Dff, DffFrame, DffLightFlags
+
+dff = Dff()
+dff.frames.append(DffFrame(name="lamp"))
+
+dff.add_point_light(
+    frame_index=0,
+    radius=20.0,
+    color=(1.0, 0.85, 0.55),
+    flags=DffLightFlags.SCENE,
+)
+dff.add_spot_light(
+    frame_index=0,
+    radius=35.0,
+    angle_degrees=45.0,
+    soft=True,
+)
 ```
 
 ## API reference
@@ -218,7 +252,7 @@ if dff.collision:
 
 | Class | Description |
 |-------|-------------|
-| `Dff` | DFF parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `get_meshes()`, `to_generic_meshes()` |
+| `Dff` | DFF parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `get_meshes()`, `to_generic_meshes()`, `get_lights()`, `add_*_light()` |
 | `Txd` | TXD parser. `from_file(path)`, `from_bytes(data)`, `export_to_dds(folder)` |
 | `TxdTexture` | Single texture entry. `to_rgba()` decodes any format to raw RGBA bytes |
 | `Img` | IMG archive. `from_file(path)`, `read(name)`, `find(name)`, `extract()`, `extract_all()`, `create_v2()` |
@@ -236,6 +270,9 @@ if dff.collision:
 | `DffMaterial` | Color, texture name, ambient/diffuse/specular, material effects, specular/reflection extensions |
 | `DffFrame` | Name, position, rotation matrix, parent index, HAnim skeleton data |
 | `DffAtomic` | Links a frame to a geometry |
+| `DffLight` | RenderWare real-time light with frame index, radius, RGB color, spotlight angle helpers, flags, and type |
+| `DffLightType` | Named RenderWare light types: directional, ambient, point, spot, spot soft |
+| `DffLightFlags` | Named RenderWare light flags: scene/world scope |
 | `MorphTarget` | Per-morph-target vertices and normals with bounding sphere |
 | `BinMeshPLG` | Triangle strip/list splits by material |
 | `SkinPLG` | Bone indices, weights, and inverse bind matrices per vertex |
