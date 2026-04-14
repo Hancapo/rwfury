@@ -11,6 +11,7 @@ from .dff_parts.models import (
     DffFrame,
     DffGeometry,
     DffLight,
+    DffUvAnimation,
 )
 from .rwbinary import RwBinaryReader
 
@@ -23,6 +24,7 @@ class Dff(DffApiMixin, DffReaderMixin, DffWriterMixin):
         self.geometries: list[DffGeometry] = []
         self.atomics: list[DffAtomic] = []
         self.lights: list[DffLight] = []
+        self.uv_animations: list[DffUvAnimation] = []
         self.collision: CollisionData | None = None
         self.rw_version: int = 0
 

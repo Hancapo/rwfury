@@ -38,11 +38,11 @@ class DffGeometryReaderMixin:
         num_geometries = reader.read_u32()
 
         for _ in range(num_geometries):
-            if reader.tell() >= chunk_end:
+            if not self._can_read_chunk_header(reader, chunk_end):
                 break
             geom_header = reader.read_chunk_header()
             if geom_header.id == RW_GEOMETRY:
-                geom_end = reader.tell() + geom_header.size
+                geom_end = self._bounded_chunk_end(reader, geom_header.size, chunk_end)
                 self.geometries.append(self._parse_geometry(reader, geom_end, geom_header.version))
             else:
                 reader.skip(geom_header.size)
@@ -126,9 +126,9 @@ class DffGeometryReaderMixin:
                 geom.normals = mt.normals
 
         # Child chunks (material list + extension)
-        while reader.tell() < chunk_end:
+        while self._can_read_chunk_header(reader, chunk_end):
             child = reader.read_chunk_header()
-            child_end = reader.tell() + child.size
+            child_end = self._bounded_chunk_end(reader, child.size, chunk_end)
 
             if child.id == RW_MATERIAL_LIST:
                 self._parse_material_list(reader, child_end, geom)
@@ -141,9 +141,9 @@ class DffGeometryReaderMixin:
 
     def _parse_geometry_extension(self, reader: RwBinaryReader, chunk_end: int,
                                   geom: DffGeometry, num_vertices: int):
-        while reader.tell() < chunk_end:
+        while self._can_read_chunk_header(reader, chunk_end):
             plugin = reader.read_chunk_header()
-            plugin_end = reader.tell() + plugin.size
+            plugin_end = self._bounded_chunk_end(reader, plugin.size, chunk_end)
 
             if plugin.id == RW_BIN_MESH:
                 geom.bin_mesh = self._parse_bin_mesh(reader, plugin_end)

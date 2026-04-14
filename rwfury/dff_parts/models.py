@@ -55,6 +55,45 @@ class DffMaterial:
     specular_level: float = 0.0
     specular_texture: str = ""
     reflection: dict | None = None
+    uv_animations: list[DffUvAnimationRef] = field(default_factory=list)
+
+    @property
+    def uv_animation_names(self) -> list[str]:
+        return [ref.name for ref in self.uv_animations]
+
+
+@dataclass
+class DffUvAnimationRef:
+    channel: int = 0
+    name: str = ""
+
+
+@dataclass
+class DffUvAnimationFrame:
+    time: float = 0.0
+    scale: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    position: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    previous_frame: int = -1
+
+
+@dataclass
+class DffUvAnimation:
+    version: int = 0x100
+    animation_type: int = 0x1C1
+    declared_frame_count: int = 0
+    flags: int = 0
+    duration: float = 0.0
+    unknown: int = 0
+    name: str = ""
+    node_to_uv: tuple[float, float, float, float, float, float, float, float] = (
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+    )
+    frames: list[DffUvAnimationFrame] = field(default_factory=list)
+    raw_data: bytes = b""
+
+    @property
+    def frame_count(self) -> int:
+        return self.declared_frame_count or len(self.frames)
 
 
 @dataclass

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
+
 from ..generic_mesh import GenericMesh
 from ..rwbinary import RwBinaryWriter
 from .mesh_export import build_generic_mesh_from_indices, expand_bin_mesh_indices
-from .models import DffFrame, DffLight, DffLightFlags, Mesh
+from .models import DffFrame, DffLight, DffLightFlags, DffUvAnimation, Mesh
 
 
 class DffApiMixin:
@@ -37,6 +39,100 @@ class DffApiMixin:
     def add_light(self, light: DffLight) -> DffLight:
         self.lights.append(light)
         return light
+
+    def get_uv_animations(self) -> list[DffUvAnimation]:
+        return list(self.uv_animations)
+
+    def get_uv_animation(self, name: str) -> DffUvAnimation | None:
+        name_lower = name.lower()
+        for animation in self.uv_animations:
+            if animation.name.lower() == name_lower:
+                return animation
+        return None
+
+    def get_material_uv_animations(self) -> list[dict]:
+        results = []
+        for geom_index, geom in enumerate(self.geometries):
+            for material_index, material in enumerate(geom.materials):
+                if not material.uv_animations:
+                    continue
+                results.append({
+                    "geometry_index": geom_index,
+                    "material_index": material_index,
+                    "material": material,
+                    "references": list(material.uv_animations),
+                    "animations": [
+                        self.get_uv_animation(ref.name)
+                        for ref in material.uv_animations
+                    ],
+                })
+        return results
+
+    def to_uv_animation_data(self) -> dict:
+        usage_by_name: dict[str, list[dict]] = {}
+        for geom_index, geom in enumerate(self.geometries):
+            for material_index, material in enumerate(geom.materials):
+                if not material.uv_animations:
+                    continue
+                usage = {
+                    "geometry_index": geom_index,
+                    "material_index": material_index,
+                    "texture_name": material.texture_name,
+                    "mask_name": material.mask_name,
+                    "uv_animations": [
+                        {
+                            "channel": ref.channel,
+                            "name": ref.name,
+                        }
+                        for ref in material.uv_animations
+                    ],
+                }
+                for ref in material.uv_animations:
+                    usage_by_name.setdefault(ref.name, []).append(usage)
+
+        animations = []
+        for animation in self.uv_animations:
+            animations.append({
+                "name": animation.name,
+                "version": animation.version,
+                "type": animation.animation_type,
+                "flags": animation.flags,
+                "duration": animation.duration,
+                "unknown": animation.unknown,
+                "frame_count": animation.frame_count,
+                "node_to_uv": list(animation.node_to_uv),
+                "frames": [
+                    {
+                        "time": frame.time,
+                        "scale": list(frame.scale),
+                        "position": list(frame.position),
+                        "previous_frame": frame.previous_frame,
+                    }
+                    for frame in animation.frames
+                ],
+                "materials": usage_by_name.get(animation.name, []),
+            })
+
+        return {
+            "animation_count": len(animations),
+            "material_animation_count": sum(
+                len(material.uv_animations)
+                for geom in self.geometries
+                for material in geom.materials
+            ),
+            "animations": animations,
+        }
+
+    def export_uv_animations(self, path: str) -> dict:
+        """Export UV animation definitions and material usage as JSON."""
+        data = self.to_uv_animation_data()
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+        return data
+
+    def to_uv_animation_json(self, indent: int = 2) -> str:
+        """Serialize UV animation definitions and material usage to JSON."""
+        return json.dumps(self.to_uv_animation_data(), indent=indent)
 
     def add_ambient_light(
         self,

@@ -4,6 +4,7 @@ import io
 import struct
 
 from ..rwbinary import (
+    RW_ANIM_ANIMATION,
     RwBinaryWriter,
     RW_STRUCT,
     RW_STRING,
@@ -27,6 +28,8 @@ from ..rwbinary import (
     RW_COLLISION,
     RW_SPECULAR_MAT,
     RW_REFLECTION_MAT,
+    RW_UV_ANIM_DICT,
+    RW_UV_ANIM_PLG,
     GEO_PRELIT,
     GEO_NATIVE,
 )
@@ -36,6 +39,9 @@ from .models import (
     DffGeometry,
     DffLight,
     DffMaterial,
+    DffUvAnimation,
+    DffUvAnimationFrame,
+    DffUvAnimationRef,
     Effect2dfxEntry,
     Effect2dfxLight,
     Effect2dfxParticle,
@@ -54,6 +60,9 @@ class DffWriterMixin:
     def _write(self, w: RwBinaryWriter):
         """Write the full DFF clump."""
         ver = self.rw_version or 0x1803FFFF
+
+        if self.uv_animations:
+            self._write_uv_animation_dict(w, ver)
 
         # We build the clump body in memory to know the size
         body_stream = io.BytesIO()
@@ -92,6 +101,56 @@ class DffWriterMixin:
         body_data = body_stream.getvalue()
         w.write_chunk_header(RW_CLUMP, len(body_data), ver)
         w.write_bytes(body_data)
+
+    def _write_uv_animation_dict(self, w: RwBinaryWriter, ver: int):
+        body_stream = io.BytesIO()
+        bw = RwBinaryWriter(body_stream)
+
+        struct_data = struct.pack("<I", len(self.uv_animations))
+        bw.write_chunk_header(RW_STRUCT, len(struct_data), ver)
+        bw.write_bytes(struct_data)
+
+        for animation in self.uv_animations:
+            self._write_uv_animation(bw, ver, animation)
+
+        body_data = body_stream.getvalue()
+        w.write_chunk_header(RW_UV_ANIM_DICT, len(body_data), ver)
+        w.write_bytes(body_data)
+
+    def _write_uv_animation(self, w: RwBinaryWriter, ver: int, animation: DffUvAnimation):
+        if animation.animation_type == 0x1C1 and not animation.raw_data:
+            body = struct.pack(
+                "<IIIIf",
+                animation.version,
+                animation.animation_type,
+                animation.frame_count,
+                animation.flags,
+                animation.duration,
+            )
+            body += struct.pack("<i", animation.unknown)
+            body += animation.name.encode("ascii", errors="replace").ljust(32, b"\x00")[:32]
+            body += struct.pack("<8f", *animation.node_to_uv)
+            for frame in animation.frames:
+                body += struct.pack(
+                    "<f3f3fi",
+                    frame.time,
+                    *frame.scale,
+                    *frame.position,
+                    frame.previous_frame,
+                )
+        else:
+            body = struct.pack(
+                "<IIIIf",
+                animation.version,
+                animation.animation_type,
+                animation.frame_count,
+                animation.flags,
+                animation.duration,
+            )
+            body += animation.raw_data
+
+        w.write_chunk_header(RW_ANIM_ANIMATION, len(body), ver)
+        w.write_bytes(body)
 
     def _write_light(self, w: RwBinaryWriter, ver: int, light: DffLight):
         body_stream = io.BytesIO()
@@ -343,10 +402,11 @@ class DffWriterMixin:
 
         # Extension
         ext_data = b""
-        if mat.mat_fx_type and mat.mat_fx_data:
-            fx_body = struct.pack("<I", mat.mat_fx_type)
-            # Simplified: write raw fx data type markers
+        fx_body = self._build_mat_fx_body(mat, ver)
+        if fx_body:
             ext_data += struct.pack("<III", RW_MAT_EFFECTS, len(fx_body), ver) + fx_body
+        if mat.uv_animations:
+            ext_data += self._build_uv_animation_plg_data(mat.uv_animations, ver)
         if mat.specular_level > 0 or mat.specular_texture:
             spec_body = struct.pack("<f", mat.specular_level)
             spec_body += mat.specular_texture.encode("ascii").ljust(24, b"\x00")[:24]
@@ -389,6 +449,94 @@ class DffWriterMixin:
         tex_data = tex_stream.getvalue()
         w.write_chunk_header(RW_TEXTURE, len(tex_data), ver)
         w.write_bytes(tex_data)
+
+    def _build_uv_animation_plg_data(
+        self, refs: list[DffUvAnimationRef], ver: int
+    ) -> bytes:
+        channel_mask = 0
+        struct_body = b""
+        for ref in sorted(refs, key=lambda item: item.channel):
+            channel_mask |= 1 << ref.channel
+            struct_body += ref.name.encode("ascii", errors="replace").ljust(32, b"\x00")[:32]
+        struct_body = struct.pack("<I", channel_mask) + struct_body
+        return (
+            struct.pack("<III", RW_UV_ANIM_PLG, 12 + len(struct_body), ver)
+            + struct.pack("<III", RW_STRUCT, len(struct_body), ver)
+            + struct_body
+        )
+
+    def _build_mat_fx_body(self, mat: DffMaterial, ver: int) -> bytes:
+        mat_fx_type = mat.mat_fx_type or (5 if mat.uv_animations else 0)
+        if not mat_fx_type:
+            return b""
+
+        body = struct.pack("<I", mat_fx_type)
+        effect1 = mat.mat_fx_data.get("effect1") if mat.mat_fx_data else None
+        effect2 = mat.mat_fx_data.get("effect2") if mat.mat_fx_data else None
+
+        if effect1 is None and effect2 is None and mat_fx_type == 5:
+            effect1 = {"type": 5}
+            effect2 = {"type": 0}
+
+        if effect1 is None and effect2 is None:
+            return body
+
+        body += self._build_mat_fx_slot(effect1 or {"type": mat_fx_type}, ver)
+        if effect2 is not None or mat_fx_type in (3, 5, 6):
+            body += self._build_mat_fx_slot(effect2 or {"type": 0}, ver)
+        return body
+
+    def _build_mat_fx_slot(self, slot: dict, ver: int) -> bytes:
+        slot_type = int(slot.get("type", 0))
+        body = struct.pack("<I", slot_type)
+
+        if slot_type == 1:
+            body += struct.pack("<fI", slot.get("intensity", 1.0), int(slot.get("has_bump_map", 0)))
+            if slot.get("has_bump_map"):
+                body += self._build_inline_texture(slot.get("bump_map", {}), ver)
+            body += struct.pack("<I", int(slot.get("has_height_map", 0)))
+            if slot.get("has_height_map"):
+                body += self._build_inline_texture(slot.get("height_map", {}), ver)
+        elif slot_type == 2:
+            body += struct.pack(
+                "<fII",
+                slot.get("reflection_coeff", 1.0),
+                int(slot.get("use_fb_alpha", 0)),
+                int(slot.get("has_env_map", 0)),
+            )
+            if slot.get("has_env_map"):
+                body += self._build_inline_texture(slot.get("env_map", {}), ver)
+        elif slot_type == 4:
+            body += struct.pack(
+                "<iiI",
+                int(slot.get("src_blend", 0)),
+                int(slot.get("dst_blend", 0)),
+                int(slot.get("has_texture", 0)),
+            )
+            if slot.get("has_texture"):
+                body += self._build_inline_texture(slot.get("texture", {}), ver)
+
+        return body
+
+    def _build_inline_texture(self, texture: dict, ver: int) -> bytes:
+        tex_stream = io.BytesIO()
+        tw = RwBinaryWriter(tex_stream)
+
+        filter_flags = int(texture.get("filter", 0x1106))
+        tw.write_chunk_header(RW_STRUCT, 4, ver)
+        tw.write_u32(filter_flags)
+
+        for key in ("name", "mask"):
+            value = str(texture.get(key, ""))
+            raw = value.encode("ascii", errors="replace") + b"\x00"
+            raw = raw.ljust((len(raw) + 3) & ~3, b"\x00")
+            tw.write_chunk_header(RW_STRING, len(raw), ver)
+            tw.write_bytes(raw)
+
+        tw.write_chunk_header(RW_EXTENSION, 0, ver)
+
+        tex_data = tex_stream.getvalue()
+        return struct.pack("<III", RW_TEXTURE, len(tex_data), ver) + tex_data
 
     def _write_atomic(self, w: RwBinaryWriter, ver: int, atomic: DffAtomic):
         body_stream = io.BytesIO()

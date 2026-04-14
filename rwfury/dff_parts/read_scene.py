@@ -16,7 +16,7 @@ class DffSceneReaderMixin:
     def _parse_light(self, reader: RwBinaryReader, chunk_end: int) -> DffLight:
         struct_h = reader.read_chunk_header()
         assert struct_h.id == RW_STRUCT
-        struct_end = reader.tell() + struct_h.size
+        struct_end = self._bounded_chunk_end(reader, struct_h.size, chunk_end)
 
         light = DffLight()
         if struct_h.size >= 28:
@@ -30,9 +30,9 @@ class DffSceneReaderMixin:
         if reader.tell() < struct_end:
             reader.seek(struct_end)
 
-        while reader.tell() < chunk_end:
+        while self._can_read_chunk_header(reader, chunk_end):
             child = reader.read_chunk_header()
-            child_end = reader.tell() + child.size
+            child_end = self._bounded_chunk_end(reader, child.size, chunk_end)
 
             if child.id == RW_EXTENSION:
                 light.extension_data = reader.read_bytes(child.size)
@@ -61,11 +61,11 @@ class DffSceneReaderMixin:
             if ext.id != RW_EXTENSION:
                 reader.seek(reader.tell() - 12 + ext.size)
                 continue
-            ext_end = reader.tell() + ext.size
+            ext_end = self._bounded_chunk_end(reader, ext.size, chunk_end)
 
-            while reader.tell() < ext_end:
+            while self._can_read_chunk_header(reader, ext_end):
                 plugin = reader.read_chunk_header()
-                plugin_end = reader.tell() + plugin.size
+                plugin_end = self._bounded_chunk_end(reader, plugin.size, ext_end)
 
                 if plugin.id == RW_FRAME_NAME and plugin.size > 0:
                     self.frames[i].name = reader.read_string(plugin.size)

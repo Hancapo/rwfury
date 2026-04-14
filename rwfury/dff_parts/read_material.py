@@ -10,8 +10,9 @@ from ..rwbinary import (
     RW_MAT_EFFECTS,
     RW_SPECULAR_MAT,
     RW_REFLECTION_MAT,
+    RW_UV_ANIM_PLG,
 )
-from .models import DffGeometry, DffMaterial
+from .models import DffGeometry, DffMaterial, DffUvAnimationRef
 
 
 class DffMaterialReaderMixin:
@@ -24,11 +25,11 @@ class DffMaterialReaderMixin:
             reader.read_i32()
 
         for _ in range(num_materials):
-            if reader.tell() >= chunk_end:
+            if not self._can_read_chunk_header(reader, chunk_end):
                 break
             mat_header = reader.read_chunk_header()
             if mat_header.id == RW_MATERIAL:
-                mat_end = reader.tell() + mat_header.size
+                mat_end = self._bounded_chunk_end(reader, mat_header.size, chunk_end)
                 geom.materials.append(self._parse_material(reader, mat_end))
             else:
                 reader.skip(mat_header.size)
@@ -47,9 +48,9 @@ class DffMaterialReaderMixin:
         mat.diffuse = reader.read_f32()
 
         # Read remaining child chunks
-        while reader.tell() < chunk_end:
+        while self._can_read_chunk_header(reader, chunk_end):
             child = reader.read_chunk_header()
-            child_end = reader.tell() + child.size
+            child_end = self._bounded_chunk_end(reader, child.size, chunk_end)
 
             if child.id == RW_TEXTURE:
                 self._parse_texture_ref(reader, child_end, mat)
@@ -61,9 +62,9 @@ class DffMaterialReaderMixin:
         return mat
 
     def _parse_material_extension(self, reader: RwBinaryReader, chunk_end: int, mat: DffMaterial):
-        while reader.tell() < chunk_end:
+        while self._can_read_chunk_header(reader, chunk_end):
             plugin = reader.read_chunk_header()
-            plugin_end = reader.tell() + plugin.size
+            plugin_end = self._bounded_chunk_end(reader, plugin.size, chunk_end)
 
             if plugin.id == RW_MAT_EFFECTS:
                 mat.mat_fx_type = reader.read_u32()
@@ -80,6 +81,8 @@ class DffMaterialReaderMixin:
                     "intensity": reader.read_f32(),
                 }
                 reader.read_u32()  # env_tex_ptr (always 0)
+            elif plugin.id == RW_UV_ANIM_PLG:
+                mat.uv_animations = self._parse_uv_animation_plg(reader, plugin_end)
             else:
                 reader.seek(plugin_end)
 
@@ -129,12 +132,12 @@ class DffMaterialReaderMixin:
     def _parse_inline_texture(self, reader: RwBinaryReader) -> dict:
         """Parse an inline RwTexture chunk embedded in material effects."""
         tex_h = reader.read_chunk_header()
-        tex_end = reader.tell() + tex_h.size
+        tex_end = self._bounded_chunk_end(reader, tex_h.size)
         tex: dict = {"name": "", "mask": ""}
 
-        while reader.tell() < tex_end:
+        while self._can_read_chunk_header(reader, tex_end):
             child = reader.read_chunk_header()
-            child_end = reader.tell() + child.size
+            child_end = self._bounded_chunk_end(reader, child.size, tex_end)
 
             if child.id == RW_STRUCT:
                 tex["filter"] = reader.read_u32()
@@ -170,3 +173,28 @@ class DffMaterialReaderMixin:
 
         if reader.tell() < chunk_end:
             reader.seek(chunk_end)
+
+    def _parse_uv_animation_plg(
+        self, reader: RwBinaryReader, chunk_end: int
+    ) -> list[DffUvAnimationRef]:
+        if reader.tell() >= chunk_end:
+            return []
+
+        struct_h = reader.read_chunk_header()
+        assert struct_h.id == RW_STRUCT
+        struct_end = self._bounded_chunk_end(reader, struct_h.size, chunk_end)
+
+        channel_mask = reader.read_u32()
+        refs: list[DffUvAnimationRef] = []
+        for channel in range(8):
+            if channel_mask & (1 << channel):
+                refs.append(DffUvAnimationRef(
+                    channel=channel,
+                    name=reader.read_string(32),
+                ))
+
+        if reader.tell() < struct_end:
+            reader.seek(struct_end)
+        if reader.tell() < chunk_end:
+            reader.seek(chunk_end)
+        return refs
