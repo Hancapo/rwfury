@@ -282,10 +282,7 @@ class SaPathFile:
             packed = struct.unpack("<H", _read_exact(stream, 2))[0]
             path_file.navi_links.append(NaviLink.from_packed(packed))
         path_file.link_lengths = list(_read_exact(stream, link_count))
-        path_file.intersection_flags = [
-            PathIntersectionFlag(value)
-            for value in _read_exact(stream, link_count)
-        ]
+        path_file.intersection_flags = _read_intersection_flags(stream, link_count)
         path_file.trailing_data = stream.read()
         return path_file
 
@@ -387,6 +384,21 @@ def _read_exact(stream: io.BytesIO, count: int) -> bytes:
     if len(data) != count:
         raise EOFError(f"Expected {count} bytes, got {len(data)}")
     return data
+
+
+def _read_intersection_flags(
+    stream: io.BytesIO, link_count: int
+) -> list[PathIntersectionFlag]:
+    """Read section 7, tolerating path files that omit it entirely.
+
+    Some valid modded path files keep the earlier SA sections intact but do not
+    include a full intersection-flags table. In that case we treat the whole
+    remainder as trailing data and default the flags to zero.
+    """
+    remaining = len(stream.getbuffer()) - stream.tell()
+    if remaining < link_count:
+        return [PathIntersectionFlag(0) for _ in range(link_count)]
+    return [PathIntersectionFlag(value) for value in _read_exact(stream, link_count)]
 
 
 def _read_path_node(stream: io.BytesIO, kind: PathNodeKind) -> PathNode:
