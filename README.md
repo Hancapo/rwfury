@@ -1,6 +1,6 @@
 # rwfury
 
-Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), **COL** (collision), and GTA SA **nodes*.dat** path files. Supports GTA III, Vice City, and San Andreas.
+Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), **COL** (collision), **IFP** (animation package), and GTA SA **nodes*.dat** path files. Supports GTA III, Vice City, and San Andreas.
 
 ## Features
 
@@ -10,11 +10,13 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 - **TXD**: parse texture dictionaries, export DDS, and decode raw RGBA data
 - **IMG**: read and write v1 (GTA III/VC) and v2 (San Andreas) archives, extract files, and parse DFF/TXD directly from memory
 - **COL**: parse and write COL1, COL2, and COL3 collision files
+- **IFP**: parse and write GTA San Andreas `ANP3` animation packages
 - **Paths**: read and write San Andreas `nodes*.dat` path files
 
 ### DFF support
 
 - **Plugin coverage**: BinMesh, Skin, HAnim, 2dfx, Material Effects, Night Colors, embedded Collision, and Specular/Reflection materials
+- **UV animation support**: parse, write, inspect, and export DFF UV animation dictionaries and material references
 - **RenderWare lights**: read and write `RW_LIGHT` chunks attached to frames
 - **Version-aware parsing**: handles RenderWare 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
 
@@ -27,6 +29,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 ### Practical scope
 
 - **COL coverage**: spheres, boxes, face groups, and shadow meshes
+- **IFP coverage**: San Andreas `ANP3` packages, including object animation data used by some modded archives
 - **Path coverage**: nodes, navi nodes, links, navi links, link lengths, and intersection flags
 - **Pure Python**: zero external dependencies
 
@@ -283,6 +286,24 @@ dff.add_spot_light(
 )
 ```
 
+### Read an IFP animation package
+
+```python
+from rwfury import Ifp
+
+ifp = Ifp.from_file("ped.ifp")
+
+print(ifp.internal_name)
+print(ifp.get_animation_names()[:5])
+
+anim = ifp.get_animation("ARRESTgun")
+obj = ifp.get_object("ARRESTgun", "Root")
+
+print(len(anim.objects), int(obj.frame_type), len(obj.frames))
+
+json_text = ifp.to_animation_json()
+```
+
 ## API reference
 
 ### Core classes
@@ -297,6 +318,7 @@ dff.add_spot_light(
 | `Col` | COL parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()` |
 | `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
 | `ColMaterial` | Named `IntEnum` for COL surface material IDs |
+| `Ifp` | IFP parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()`, animation lookup, and JSON export helpers |
 | `SaPaths` / `SaPathFile` | GTA SA `nodes*.dat` parser/writer with section-aware helpers |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
@@ -360,11 +382,11 @@ dff.add_spot_light(
 
 ## Supported formats
 
-| Game | RW Version | DFF | TXD | IMG | COL | Paths |
-|------|-----------|-----|-----|-----|-----|-------|
-| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - |
-| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | `nodes*.dat` (Read/Write) |
+| Game | RW Version | DFF | TXD | IMG | COL | IFP | Paths |
+|------|-----------|-----|-----|-----|-----|-----|-------|
+| GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
+| GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | ANP3 (Read/Write) | `nodes*.dat` (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
 
