@@ -4,18 +4,31 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 
 ## Features
 
-- **DFF parsing** with full plugin support: BinMesh, Skin, HAnim, 2dfx, Material Effects, Night Colors, Collision, Specular/Reflection materials
-- **DFF writing** back to binary (round-trip)
-- **DFF real-time lights**: read/write RenderWare `RW_LIGHT` chunks attached to frames
-- **TXD parsing** with DDS export and raw RGBA decoding
-- **IMG archives**: read/write v1 (GTA III/VC) and v2 (San Andreas), extract files, parse DFF/TXD directly from memory
-- **COL parsing/writing** for standalone collision files: COL1, COL2, and COL3, including spheres, boxes, face groups, and shadow meshes
-- **Named collision materials** via `ColMaterial` enum for readable COL surface IDs
-- **GTA SA path files**: read/write `nodes*.dat` vehicle/ped graph nodes, navi nodes, links, navi links, link lengths, and intersection flags
-- **Version-aware**: handles RW 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
-- **GenericMesh**: format-agnostic mesh representation with flat arrays and byte-packing helpers for easy porting to glTF, FBX, or any custom format
-- **BinMesh-aware generic export**: `to_generic_meshes()` preserves material splits from BinMesh, including triangle strips
-- Zero external dependencies (pure Python, stdlib only)
+### Core game formats
+
+- **DFF**: parse and write RenderWare clumps with round-trip support
+- **TXD**: parse texture dictionaries, export DDS, and decode raw RGBA data
+- **IMG**: read and write v1 (GTA III/VC) and v2 (San Andreas) archives, extract files, and parse DFF/TXD directly from memory
+- **COL**: parse and write COL1, COL2, and COL3 collision files
+- **Paths**: read and write San Andreas `nodes*.dat` path files
+
+### DFF support
+
+- **Plugin coverage**: BinMesh, Skin, HAnim, 2dfx, Material Effects, Night Colors, embedded Collision, and Specular/Reflection materials
+- **RenderWare lights**: read and write `RW_LIGHT` chunks attached to frames
+- **Version-aware parsing**: handles RenderWare 3.1 (GTA III) through 3.6 (San Andreas) struct differences automatically
+
+### Export and authoring
+
+- **Generic mesh export**: `GenericMesh` output with flat arrays and byte-packing helpers for glTF, FBX, or custom pipelines
+- **BinMesh-aware export**: `to_generic_meshes()` preserves material splits and triangle strips
+- **Named collision materials**: `ColMaterial` enum for readable collision surface IDs
+
+### Practical scope
+
+- **COL coverage**: spheres, boxes, face groups, and shadow meshes
+- **Path coverage**: nodes, navi nodes, links, navi links, link lengths, and intersection flags
+- **Pure Python**: zero external dependencies
 
 ## Installation
 
