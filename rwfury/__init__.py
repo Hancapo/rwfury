@@ -17,7 +17,7 @@ from .col import Col, ColModel, ColSphere, ColBox, ColFace, ColBounds, ColSurfac
 from .col_materials import ColMaterial
 from .paths import (
     SaPathFile, SaPaths, PathNode, NaviNode, PathLink, NaviLink, PathLinkRecord,
-    PathNodeKind, PathTrafficLevel, PathNodeFlag, PathIntersectionFlag,
+    PathFileFormat, PathNodeKind, PathTrafficLevel, PathNodeFlag, PathIntersectionFlag,
 )
 from .generic_mesh import GenericMesh
 from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
@@ -37,7 +37,7 @@ __all__ = [
     "Col", "ColModel", "ColSphere", "ColBox", "ColFace",
     "ColBounds", "ColSurface", "ColFaceGroup", "ColMaterial",
     "SaPathFile", "SaPaths", "PathNode", "NaviNode", "PathLink", "NaviLink",
-    "PathLinkRecord", "PathNodeKind", "PathTrafficLevel", "PathNodeFlag",
+    "PathLinkRecord", "PathFileFormat", "PathNodeKind", "PathTrafficLevel", "PathNodeFlag",
     "PathIntersectionFlag",
     "GenericMesh",
     "ChunkHeader", "RwBinaryReader", "RwBinaryWriter",

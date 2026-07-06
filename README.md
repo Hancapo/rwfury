@@ -1,6 +1,6 @@
 # rwfury
 
-Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), **COL** (collision), **IFP** (animation package), and GTA SA **nodes*.dat** path files. Supports GTA III, Vice City, and San Andreas.
+Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD** (texture dictionary), **IMG** (archive), **COL** (collision), **IFP** (animation package), native GTA SA **nodes*.dat** paths, and Fastman92 extended path files. Supports GTA III, Vice City, and San Andreas.
 
 ## Features
 
@@ -11,7 +11,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 - **IMG**: read and write v1 (GTA III/VC) and v2 (San Andreas) archives, extract files, and parse DFF/TXD directly from memory
 - **COL**: parse and write COL1, COL2, and COL3 collision files
 - **IFP**: parse and write GTA San Andreas `ANP3` animation packages
-- **Paths**: read and write San Andreas `nodes*.dat` path files
+- **Paths**: read and write native San Andreas `nodes*.dat` and Fastman92 extended path files
 
 ### DFF support
 
@@ -30,7 +30,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 
 - **COL coverage**: spheres, boxes, face groups, and shadow meshes
 - **IFP coverage**: San Andreas `ANP3` packages, including object animation data used by some modded archives
-- **Path coverage**: nodes, navi nodes, links, navi links, link lengths, and intersection flags
+- **Path coverage**: native SA and Fastman92 nodes, navi nodes, links, navi links, link lengths, intersection flags, extended coordinates, and format metadata
 - **Pure Python**: zero external dependencies
 
 ## Installation
@@ -145,10 +145,11 @@ if dff.collision:
 ### Read and write GTA SA path nodes
 
 ```python
-from rwfury import SaPaths, PathNodeFlag, PathTrafficLevel
+from rwfury import SaPaths, PathFileFormat, PathNodeFlag, PathTrafficLevel
 
 paths = SaPaths.from_file("nodes5.dat")
 print(paths.area_id, paths.node_count, paths.link_count)
+print(paths.source_format)
 print(SaPaths.area_origin(paths.area_id))
 
 for node in paths.vehicle_nodes[:10]:
@@ -163,6 +164,10 @@ node.flags |= PathNodeFlag.PARKING
 node.spawn_probability = 10
 
 paths.to_file("nodes5_roundtrip.dat")
+
+# Fastman92 files are detected automatically and can be written explicitly.
+fm = SaPaths.from_file("nodes120.dat")
+fm.to_file("nodes120_roundtrip.dat", format=PathFileFormat.FASTMAN92_VER2)
 ```
 
 ### Extract textures from a TXD
@@ -319,7 +324,7 @@ json_text = ifp.to_animation_json()
 | `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
 | `ColMaterial` | Named `IntEnum` for COL surface material IDs |
 | `Ifp` | IFP parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()`, animation lookup, and JSON export helpers |
-| `SaPaths` / `SaPathFile` | GTA SA `nodes*.dat` parser/writer with section-aware helpers |
+| `SaPaths` / `SaPathFile` | GTA SA native/Fastman92 path parser/writer with section-aware helpers |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
 ### DFF data classes
@@ -355,7 +360,8 @@ json_text = ifp.to_animation_json()
 
 | Class | Description |
 |-------|-------------|
-| `SaPathFile` / `SaPaths` | One `nodes*.dat` file with vehicle nodes, ped nodes, navi nodes, links, filler, link lengths, and intersection flags |
+| `SaPathFile` / `SaPaths` | One native or Fastman92 path file with vehicle nodes, ped nodes, navi nodes, links, filler, link lengths, intersection flags, and source format metadata |
+| `PathFileFormat` | Explicit format selector for auto, native SA, Fastman92 VER2, and Fastman92 VER3 |
 | `PathNode` | Section 1 graph node with scaled XYZ position and helpers for link count, traffic level, spawn probability, and behavior flags |
 | `NaviNode` | Section 2 vehicle navi node with scaled XY position, normalized direction, lane counts, traffic light behavior, and train crossing flag |
 | `PathLink` | Section 3 adjacent path node reference |
@@ -386,7 +392,7 @@ json_text = ifp.to_animation_json()
 |------|-----------|-----|-----|-----|-----|-----|-------|
 | GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
 | GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | ANP3 (Read/Write) | `nodes*.dat` (Read/Write) |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | ANP3 (Read/Write) | native `nodes*.dat` + Fastman92 VER2/VER3 (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
 

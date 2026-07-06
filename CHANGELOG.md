@@ -6,6 +6,27 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 - No unreleased changes yet.
 
+## [0.5.0] - 2026-07-06
+
+### Added
+
+- Fastman92 extended GTA SA path file support for `VER2` and `VER3`.
+- Explicit path format selection through `PathFileFormat`.
+- Fastman92 metadata preservation for source format, version, author bytes, legacy positions, extended positions, EOF marker tail, and sector padding.
+- Fastman92 writing through explicit `to_bytes()` / `to_file()` format selection.
+
+### Changed
+
+- Split path support into native API/dispatch, shared path models/helpers, and Fastman92-specific parser/writer modules.
+- Native SA path parsing and writing remain the default behavior.
+
+### Fixed
+
+- Fastman92 navi links are handled as `uint16 nodeId + uint16 areaId` instead of native SA packed 16-bit links.
+- Fastman92 extended coordinates are used as authoritative public positions to avoid native coordinate truncation.
+
+Full Changelog: https://github.com/Hancapo/rwfury/compare/v0.4.0...v0.5.0
+
 ## [0.4.0] - 2026-04-14
 
 ### Added
