@@ -10,7 +10,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 - **TXD**: parse texture dictionaries, export DDS, and decode raw RGBA data
 - **IMG**: read and write v1 (GTA III/VC) and v2 (San Andreas) archives, extract files, and parse DFF/TXD directly from memory
 - **COL**: parse and write COL1, COL2, and COL3 collision files
-- **IFP**: parse and write GTA San Andreas `ANP3` animation packages
+- **IFP**: parse and write `ANP3` and chunked `ANPK` animation packages with bit-exact unedited round-trips
 - **Paths**: read and write native San Andreas `nodes*.dat` and Fastman92 extended path files
 
 ### DFF support
@@ -29,7 +29,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 ### Practical scope
 
 - **COL coverage**: spheres, boxes, face groups, and shadow meshes
-- **IFP coverage**: San Andreas `ANP3` packages, including object animation data used by some modded archives
+- **IFP coverage**: compressed and float tracks, cutscene/object animations, translation, scale, validation, interpolation, and local transform evaluation
 - **Path coverage**: native SA and Fastman92 nodes, navi nodes, links, navi links, link lengths, intersection flags, extended coordinates, and format metadata
 - **Pure Python**: zero external dependencies
 
@@ -307,7 +307,19 @@ obj = ifp.get_object("ARRESTgun", "Root")
 print(len(anim.objects), int(obj.frame_type), len(obj.frames))
 
 json_text = ifp.to_animation_json()
+
+# Validate without preventing recovery of structurally readable tracks.
+for issue in ifp.validate():
+    print(issue.code, issue.animation_name, issue.object_name)
+
+# Evaluate every object track at one second. Shorter tracks are held.
+print(ifp.get_animation_duration("ARRESTgun"))
+for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
+    if frame is not None:
+        print(track.name, frame.to_matrix())
 ```
+
+`ANPK` packages use the same API and retain `KR00`, `KRT0`, and `KRTS` data, including scale tracks and opaque metadata needed for lossless rewriting.
 
 ## API reference
 
@@ -323,7 +335,7 @@ json_text = ifp.to_animation_json()
 | `Col` | COL parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()` |
 | `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
 | `ColMaterial` | Named `IntEnum` for COL surface material IDs |
-| `Ifp` | IFP parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()`, animation lookup, and JSON export helpers |
+| `Ifp` | ANP3/ANPK parser and writer with lookup, validation, JSON export, duration, sampling, and transform evaluation |
 | `SaPaths` / `SaPathFile` | GTA SA native/Fastman92 path parser/writer with section-aware helpers |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
 
@@ -392,7 +404,7 @@ json_text = ifp.to_animation_json()
 |------|-----------|-----|-----|-----|-----|-----|-------|
 | GTA III | 3.1 - 3.3 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
 | GTA Vice City | 3.4 - 3.5 | Read/Write | Read + DDS export | v1 (Read/Write) | COL1 (Read/Write) | - | - |
-| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | ANP3 (Read/Write) | native `nodes*.dat` + Fastman92 VER2/VER3 (Read/Write) |
+| GTA San Andreas | 3.6 | Read/Write | Read + DDS export | v2 (Read/Write) | COL2/COL3 (Read/Write) | ANP3 + ANPK (Read/Write) | native `nodes*.dat` + Fastman92 VER2/VER3 (Read/Write) |
 
 TXD supports D3D8/D3D9 platform textures: PAL4, PAL8, 16-bit (R5G6B5, A1R5G5B5, A4R4G4B4), 32-bit (A8R8G8B8, X8R8G8B8), and DXT1/DXT3/DXT5 compressed.
 

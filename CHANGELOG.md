@@ -4,7 +4,24 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 ## Unreleased
 
-- No unreleased changes yet.
+### Added
+
+- Read/write support for chunked `ANPK` animation packages used by San Andreas cutscenes and object animations.
+- `KR00`, `KRT0`, and `KRTS` tracks, including translation and scale data.
+- Uncompressed ANP3 frame type 1.
+- Animation duration, sampling, quaternion interpolation, scale interpolation, and local transform matrices.
+- Structured IFP validation and a dedicated codec test suite.
+
+### Changed
+
+- Unedited ANP3 and ANPK packages now round-trip bit-exactly, including opaque metadata, name padding, raw compressed times, and NaN payloads.
+- IFP parsing preserves recoverable unusual tracks while exposing their problems through validation.
+
+### Fixed
+
+- ANP3 declared frame-data sizes are checked against decoded tracks.
+- Signed 16-bit overflow now raises an error instead of silently clamping animation data.
+- ANPK scale tracks and non-zero section padding are no longer discarded.
 
 ## [0.5.0] - 2026-07-06
 
