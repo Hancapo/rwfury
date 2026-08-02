@@ -262,6 +262,29 @@ def test_anp3_writer_rejects_quantization_overflow():
         package.to_bytes()
 
 
+def test_writer_rejects_names_that_do_not_fit_fixed_fields():
+    package = Ifp()
+    package.internal_name = "x" * 25
+
+    with pytest.raises(ValueError, match="24-byte"):
+        package.to_bytes()
+
+
+def test_anp3_writer_rejects_scale_instead_of_dropping_it():
+    package = Ifp()
+    package.animations = [IfpAnimation(
+        name="scaled",
+        objects=[IfpObject(
+            name="Root",
+            frame_type=IfpFrameType.CHILD_FLOAT,
+            frames=[IfpFrame(scale=(1.0, 1.0, 1.0))],
+        )],
+    )]
+
+    with pytest.raises(ValueError, match="cannot store scale"):
+        package.to_bytes()
+
+
 def test_object_sampling_sorts_without_mutating_and_last_duplicate_wins():
     last = IfpFrame(translation=(5.0, 0.0, 0.0), time=2.0)
     first = IfpFrame(translation=(0.0, 0.0, 0.0), time=0.0)

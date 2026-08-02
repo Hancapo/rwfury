@@ -16,6 +16,7 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 - Unedited ANP3 and ANPK packages now round-trip bit-exactly, including opaque metadata, name padding, raw compressed times, and NaN payloads.
 - IFP parsing preserves recoverable unusual tracks while exposing their problems through validation.
+- IFP internals are split into dedicated ANP3, ANPK, model, sampling, validation, and binary modules behind the existing facade.
 
 ### Fixed
 
