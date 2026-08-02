@@ -4,6 +4,8 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 ## Unreleased
 
+## [0.6.0] - 2026-08-01
+
 ### Added
 
 - Read/write support for chunked `ANPK` animation packages used by San Andreas cutscenes and object animations.
@@ -26,6 +28,8 @@ This changelog was reconstructed from the Git history because some GitHub releas
 - ANP3 declared frame-data sizes are checked against decoded tracks.
 - Signed 16-bit overflow now raises an error instead of silently clamping animation data.
 - ANPK scale tracks and non-zero section padding are no longer discarded.
+
+Full Changelog: https://github.com/Hancapo/rwfury/compare/v0.5.0...v0.6.0
 
 ## [0.5.0] - 2026-07-06
 
