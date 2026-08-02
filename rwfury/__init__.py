@@ -12,7 +12,10 @@ from .dff_parts.models import (
 )
 from .txd import Txd, TxdTexture
 from .img import Img, ImgEntry
-from .ifp import Ifp, IfpAnimation, IfpObject, IfpFrame, IfpVersion, IfpFrameType
+from .ifp import (
+    Ifp, IfpAnimation, IfpObject, IfpFrame,
+    IfpVersion, IfpFrameType, IfpKeyframeType,
+)
 from .col import Col, ColModel, ColSphere, ColBox, ColFace, ColBounds, ColSurface, ColFaceGroup
 from .col_materials import ColMaterial
 from .paths import (
@@ -33,7 +36,8 @@ __all__ = [
     "Effect2dfxEntry", "Effect2dfxLight", "Effect2dfxParticle",
     "Txd", "TxdTexture",
     "Img", "ImgEntry",
-    "Ifp", "IfpAnimation", "IfpObject", "IfpFrame", "IfpVersion", "IfpFrameType",
+    "Ifp", "IfpAnimation", "IfpObject", "IfpFrame",
+    "IfpVersion", "IfpFrameType", "IfpKeyframeType",
     "Col", "ColModel", "ColSphere", "ColBox", "ColFace",
     "ColBounds", "ColSurface", "ColFaceGroup", "ColMaterial",
     "SaPathFile", "SaPaths", "PathNode", "NaviNode", "PathLink", "NaviLink",
