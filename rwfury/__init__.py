@@ -29,6 +29,9 @@ from .generic_animation import (
     GenericAnimation, GenericAnimationBuffers, GenericAnimationKeyframe,
     GenericAnimationSet, GenericAnimationTrack,
 )
+from .sa_bones import (
+    SA_BONE_NAMES, SaBoneTag, sa_bone_name_from_tag, sa_bone_tag_from_name,
+)
 from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
 
 __all__ = [
@@ -54,5 +57,7 @@ __all__ = [
     "GenericMesh",
     "GenericAnimation", "GenericAnimationBuffers", "GenericAnimationKeyframe",
     "GenericAnimationSet", "GenericAnimationTrack",
+    "SA_BONE_NAMES", "SaBoneTag", "sa_bone_name_from_tag",
+    "sa_bone_tag_from_name",
     "ChunkHeader", "RwBinaryReader", "RwBinaryWriter",
 ]

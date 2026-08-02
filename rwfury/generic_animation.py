@@ -65,14 +65,18 @@ class GenericAnimationBuffers:
 class GenericAnimationTrack:
     """A format-neutral transform track backed by flat channel arrays.
 
-    Rotations use quaternion ``x, y, z, w`` order. Translations and scales use
-    ``x, y, z`` order. A missing channel is represented by ``None`` rather than
-    fabricated identity values. Array and keyframe order always matches source
+    Rotations use quaternion ``x, y, z, w`` order. ``bone_id`` is the effective
+    target ID while ``source_bone_id`` retains the file value when conversion
+    resolves an otherwise unnamed target. Translations and scales use ``x, y,
+    z`` order. A missing channel is represented by ``None`` rather than a
+    fabricated identity value. Array and keyframe order always matches source
     order, including duplicate or regressing timestamps.
     """
 
     name: str = ""
     bone_id: int = -1
+    source_bone_id: int | None = None
+    bone_binding: str = "unresolved"
     times: list[float] = field(default_factory=list)
     rotations: list[float] = field(default_factory=list)
     translations: list[float] | None = None
@@ -250,6 +254,12 @@ class GenericAnimation:
     name: str = ""
     tracks: list[GenericAnimationTrack] = field(default_factory=list)
     source_index: int = 0
+    time_unit: str = "seconds"
+    time_mode: str = "absolute"
+    rotation_order: str = "xyzw"
+    transform_space: str = "local"
+    rotation_semantics: str = "absolute_local"
+    missing_channel_semantics: str = "preserve_bind_pose"
     source_metadata: dict[str, object] = field(default_factory=dict)
 
     @property
@@ -267,6 +277,15 @@ class GenericAnimation:
     def get_tracks_by_bone_id(self, bone_id: int) -> list[GenericAnimationTrack]:
         return [track for track in self.tracks if track.bone_id == bone_id]
 
+    def get_tracks_by_source_bone_id(
+        self,
+        bone_id: int,
+    ) -> list[GenericAnimationTrack]:
+        return [
+            track for track in self.tracks
+            if track.source_bone_id == bone_id
+        ]
+
 
 @dataclass
 class GenericAnimationSet:
@@ -276,8 +295,11 @@ class GenericAnimationSet:
     animations: list[GenericAnimation] = field(default_factory=list)
     source_format: str = ""
     time_unit: str = "seconds"
+    time_mode: str = "absolute"
     rotation_order: str = "xyzw"
     transform_space: str = "local"
+    rotation_semantics: str = "absolute_local"
+    missing_channel_semantics: str = "preserve_bind_pose"
     source_metadata: dict[str, object] = field(default_factory=dict)
 
     def get_animations(self, name: str) -> list[GenericAnimation]:

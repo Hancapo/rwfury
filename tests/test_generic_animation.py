@@ -4,7 +4,11 @@ import struct
 import pytest
 
 from rwfury import (
+    Dff,
+    DffFrame,
     GenericAnimationTrack,
+    HAnimBone,
+    HAnimPLG,
     Ifp,
     IfpAnimation,
     IfpFrame,
@@ -12,6 +16,9 @@ from rwfury import (
     IfpKeyframeType,
     IfpObject,
     IfpVersion,
+    SaBoneTag,
+    sa_bone_name_from_tag,
+    sa_bone_tag_from_name,
 )
 
 
@@ -62,8 +69,15 @@ def test_generic_export_preserves_source_order_channels_and_duplicate_names():
     assert generic.name == "ped"
     assert generic.source_format == "ANP3"
     assert generic.time_unit == "seconds"
+    assert generic.time_mode == "absolute"
     assert generic.rotation_order == "xyzw"
     assert generic.transform_space == "local"
+    assert generic.rotation_semantics == "absolute_local"
+    assert generic.missing_channel_semantics == "preserve_bind_pose"
+    assert clip.time_mode == "absolute"
+    assert clip.rotation_order == "xyzw"
+    assert clip.rotation_semantics == "absolute_local"
+    assert clip.missing_channel_semantics == "preserve_bind_pose"
     assert clip.source_index == 0
     assert [track.source_index for track in clip.tracks] == [0, 1]
     assert root.times == [2.0, -1.0]
@@ -74,7 +88,13 @@ def test_generic_export_preserves_source_order_channels_and_duplicate_names():
     assert duplicate.raw_times is None
     assert duplicate.get_keyframe(0).translation is None
     assert root.get_keyframe(-1).raw_time == -60
-    assert clip.get_tracks_by_bone_id(0) == [root]
+    assert root.source_bone_id == 0
+    assert root.bone_binding == "source_id"
+    assert duplicate.source_bone_id == -1
+    assert duplicate.bone_id == int(SaBoneTag.ROOT)
+    assert duplicate.bone_binding == "sa_hanim_name"
+    assert clip.get_tracks_by_bone_id(0) == [root, duplicate]
+    assert clip.get_tracks_by_source_bone_id(-1) == [duplicate]
     assert clip.source_metadata["source_unknown"] == 17
     assert root.source_metadata["source_frame_type"] == int(IfpFrameType.ROOT)
 
@@ -179,3 +199,48 @@ def test_generic_animation_iterator_does_not_require_eager_package_conversion():
     assert next(iterator).name == "changed-before-conversion"
     with pytest.raises(StopIteration):
         next(iterator)
+
+
+def test_sa_ped_bone_names_resolve_ifp_and_dff_variants():
+    assert SaBoneTag.from_name("R Forearm") is SaBoneTag.RIGHT_FOREARM
+    assert sa_bone_tag_from_name(" R ForeArm") is SaBoneTag.RIGHT_FOREARM
+    assert sa_bone_tag_from_name("R Fingers") is SaBoneTag.RIGHT_FINGER
+    assert sa_bone_tag_from_name(" R Finger") is SaBoneTag.RIGHT_FINGER
+    assert sa_bone_tag_from_name(" L Toe0") is SaBoneTag.LEFT_TOE
+    assert sa_bone_name_from_tag(SaBoneTag.LEFT_TOE) == "L Toe"
+    assert sa_bone_tag_from_name("custom object") is None
+    with pytest.raises(ValueError, match="Unknown"):
+        SaBoneTag.from_name("custom object")
+
+
+def test_ifp_name_binding_resolves_to_dff_skin_index_without_data_loss():
+    obj = IfpObject(name="R Fingers", bone_id=-1)
+    custom = IfpObject(name="fam3", bone_id=-1)
+    package = Ifp()
+    package.animations = [IfpAnimation(name="pose", objects=[obj, custom])]
+
+    dff = Dff()
+    dff.frames = [
+        DffFrame(
+            name="Root",
+            hanim=HAnimPLG(bones=[
+                HAnimBone(node_id=0, node_index=0),
+                HAnimBone(node_id=25, node_index=12),
+            ]),
+        ),
+        DffFrame(name=" R Finger", hanim=HAnimPLG(node_id=25)),
+    ]
+
+    track, unresolved = package.get_generic_animation("pose").tracks
+
+    assert obj.bone_id == -1
+    assert obj.resolved_bone_id == int(SaBoneTag.RIGHT_FINGER)
+    assert obj.bone_tag is SaBoneTag.RIGHT_FINGER
+    assert track.source_bone_id == -1
+    assert track.bone_id == int(SaBoneTag.RIGHT_FINGER)
+    assert track.bone_binding == "sa_hanim_name"
+    assert dff.get_hanim_bone_index(track.bone_id) == 12
+    assert dff.get_hanim_frame_index(track.bone_id) == 1
+    assert unresolved.bone_id == -1
+    assert unresolved.source_bone_id == -1
+    assert unresolved.bone_binding == "unresolved"

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum, IntEnum
 from typing import Literal
 
+from ..sa_bones import SaBoneTag, sa_bone_tag_from_name
 from . import sampling
 
 
@@ -92,6 +93,22 @@ class IfpObject:
     @property
     def has_scale(self) -> bool:
         return self.keyframe_type == IfpKeyframeType.ROTATION_TRANSLATION_SCALE
+
+    @property
+    def resolved_bone_id(self) -> int:
+        """Return the source ID or GTA SA's canonical name-derived HAnim ID."""
+        if self.bone_id != int(SaBoneTag.UNKNOWN):
+            return self.bone_id
+        tag = sa_bone_tag_from_name(self.name)
+        return int(tag) if tag is not None else int(SaBoneTag.UNKNOWN)
+
+    @property
+    def bone_tag(self) -> SaBoneTag | None:
+        """Return the resolved ID as a known SA bone tag when possible."""
+        try:
+            return SaBoneTag(self.resolved_bone_id)
+        except ValueError:
+            return None
 
     @property
     def duration(self) -> float:
