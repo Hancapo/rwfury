@@ -25,6 +25,10 @@ from .paths import (
     PathFileFormat, PathNodeKind, PathTrafficLevel, PathNodeFlag, PathIntersectionFlag,
 )
 from .generic_mesh import GenericMesh
+from .generic_animation import (
+    GenericAnimation, GenericAnimationBuffers, GenericAnimationKeyframe,
+    GenericAnimationSet, GenericAnimationTrack,
+)
 from .rwbinary import ChunkHeader, RwBinaryReader, RwBinaryWriter
 
 __all__ = [
@@ -48,5 +52,7 @@ __all__ = [
     "PathLinkRecord", "PathFileFormat", "PathNodeKind", "PathTrafficLevel", "PathNodeFlag",
     "PathIntersectionFlag",
     "GenericMesh",
+    "GenericAnimation", "GenericAnimationBuffers", "GenericAnimationKeyframe",
+    "GenericAnimationSet", "GenericAnimationTrack",
     "ChunkHeader", "RwBinaryReader", "RwBinaryWriter",
 ]
