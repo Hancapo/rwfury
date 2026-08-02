@@ -31,6 +31,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 
 - **COL coverage**: spheres, boxes, face groups, and shadow meshes
 - **IFP coverage**: compressed and float tracks, cutscene/object animations, translation, scale, validation, interpolation, and local transform evaluation
+- **Ped skeleton binding**: canonical `SaBoneTag` IDs bridge ANP3 names, DFF HAnim nodes, and skin bone indices
 - **Path coverage**: native SA and Fastman92 nodes, navi nodes, links, navi links, link lengths, intersection flags, extended coordinates, and format metadata
 - **Pure Python**: zero external dependencies
 
@@ -295,9 +296,11 @@ dff.add_spot_light(
 ### Read an IFP animation package
 
 ```python
-from rwfury import Ifp
+from rwfury import Dff, Ifp, Img
 
-ifp = Ifp.from_file("ped.ifp")
+ifp = Ifp.from_file("anim/ped.ifp")
+img = Img.from_file("models/gta3.img")
+dff = Dff.from_bytes(img.read("bmycr.dff"))
 
 print(ifp.internal_name)
 print(ifp.get_animation_names()[:5])
@@ -312,7 +315,9 @@ generic = ifp.to_generic_animation_set()
 clip = generic.get_animation("ARRESTgun")
 for track in clip.tracks:
     buffers = track.to_buffers("f32")
-    print(track.name, track.bone_id, buffers.keyframe_count)
+    # bone_id is the effective SA HAnim tag. source_bone_id preserves the file.
+    bone_index = dff.get_hanim_bone_index(track.bone_id)
+    print(track.name, track.bone_id, bone_index, buffers.keyframe_count)
 
 # Validate without preventing recovery of structurally readable tracks.
 for issue in ifp.validate():
@@ -325,7 +330,9 @@ for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
         print(track.name, frame.to_matrix())
 ```
 
-`ANPK` packages use the same API and retain `KR00`, `KRT0`, and `KRTS` data, including scale tracks and opaque metadata needed for lossless rewriting. Generic conversion preserves clip, track, and keyframe order; duplicate names; bone IDs; original timestamps; compressed `raw_time`; non-finite values; and the distinction between absent and present translation/scale channels. Use `iter_generic_animations()` to convert large packages one clip at a time.
+`ANPK` packages use the same API and retain `KR00`, `KRT0`, and `KRTS` data, including scale tracks and opaque metadata needed for lossless rewriting. Generic conversion preserves clip, track, and keyframe order; source bone IDs; original timestamps; compressed `raw_time`; non-finite values; and the distinction between absent and present translation/scale channels. Use `iter_generic_animations()` to convert large packages one clip at a time.
+
+ANP3 pedestrian tracks commonly store `bone_id = -1`. GTA SA binds those tracks through canonical HAnim names rather than literal DFF frame names. Generic tracks therefore expose the resolved HAnim tag as `bone_id` and the untouched file value as `source_bone_id`; `Dff.get_hanim_bone_index()` maps that tag to the skinning index. Times are absolute seconds and quaternions are `xyzw` absolute local rotations. When a translation or scale channel is `None`, preserve the corresponding bind-pose component instead of replacing it with zero or identity.
 
 ## API reference
 
@@ -419,6 +426,7 @@ for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
 | `times`, `rotations` | Flat source-ordered time and quaternion (`xyzw`) arrays |
 | `translations`, `scales` | Flat XYZ arrays, or `None` when the source channel is absent |
 | `raw_times` | Original compressed time ticks when available |
+| `bone_id`, `source_bone_id`, `bone_binding` | Effective HAnim tag, untouched source ID, and resolution method |
 | `iter_keyframes()` | Iterate indexed keyframe views without changing source order |
 | `to_buffers(fmt, byte_order)` | Pack deinterleaved channels as `f32` or `f64`, little- or big-endian |
 

@@ -75,9 +75,19 @@ def _convert_track(obj: IfpObject, track_index: int) -> GenericAnimationTrack:
                 )
             scales.extend(frame.scale)
 
+    resolved_bone_id = obj.resolved_bone_id
+    if obj.bone_id != -1:
+        bone_binding = "source_id"
+    elif resolved_bone_id != -1:
+        bone_binding = "sa_hanim_name"
+    else:
+        bone_binding = "unresolved"
+
     return GenericAnimationTrack(
         name=obj.name,
-        bone_id=obj.bone_id,
+        bone_id=resolved_bone_id,
+        source_bone_id=obj.bone_id,
+        bone_binding=bone_binding,
         times=times,
         rotations=rotations,
         translations=translations,

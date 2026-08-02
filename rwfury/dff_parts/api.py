@@ -1,14 +1,39 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from ..generic_mesh import GenericMesh
 from ..rwbinary import RwBinaryWriter
 from .mesh_export import build_generic_mesh_from_indices, expand_bin_mesh_indices
 from .models import DffFrame, DffLight, DffLightFlags, DffUvAnimation, Mesh
 
+if TYPE_CHECKING:
+    from .models import HAnimBone
+
 
 class DffApiMixin:
+    def get_hanim_bones(self) -> list[HAnimBone]:
+        """Return the first complete HAnim hierarchy in node-index order."""
+        for frame in self.frames:
+            if frame.hanim and frame.hanim.bones:
+                return sorted(frame.hanim.bones, key=lambda bone: bone.node_index)
+        return []
+
+    def get_hanim_bone_index(self, node_id: int) -> int | None:
+        """Resolve an HAnim node ID to the matching skin bone index."""
+        for bone in self.get_hanim_bones():
+            if bone.node_id == node_id:
+                return bone.node_index
+        return None
+
+    def get_hanim_frame_index(self, node_id: int) -> int | None:
+        """Resolve an HAnim node ID to its DFF frame index."""
+        for frame_index, frame in enumerate(self.frames):
+            if frame.hanim and frame.hanim.node_id == node_id:
+                return frame_index
+        return None
+
     def get_light_frame(self, light: DffLight) -> DffFrame | None:
         if 0 <= light.frame_index < len(self.frames):
             return self.frames[light.frame_index]

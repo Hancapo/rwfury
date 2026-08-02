@@ -4,6 +4,20 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 ## Unreleased
 
+### Added
+
+- Canonical `SaBoneTag` names and aliases for GTA SA pedestrian HAnim skeletons.
+- DFF helpers for resolving HAnim node IDs to frame and skin bone indices.
+
+### Changed
+
+- Generic animation metadata now states absolute timestamps, absolute local `xyzw` rotations, and bind-pose preservation for absent channels.
+
+### Fixed
+
+- ANP3 pedestrian tracks with `bone_id = -1` now expose a usable name-derived HAnim ID while retaining the untouched source ID separately.
+- IFP names such as `R Forearm` and `R Fingers` now bind correctly to real DFF frames such as ` R ForeArm` and ` R Finger`.
+
 ## [0.6.0] - 2026-08-01
 
 ### Added
