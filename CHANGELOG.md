@@ -4,6 +4,8 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 ## Unreleased
 
+## [0.6.1] - 2026-08-02
+
 ### Added
 
 - Canonical `SaBoneTag` names and aliases for GTA SA pedestrian HAnim skeletons.
@@ -17,6 +19,8 @@ This changelog was reconstructed from the Git history because some GitHub releas
 
 - ANP3 pedestrian tracks with `bone_id = -1` now expose a usable name-derived HAnim ID while retaining the untouched source ID separately.
 - IFP names such as `R Forearm` and `R Fingers` now bind correctly to real DFF frames such as ` R ForeArm` and ` R Finger`.
+
+Full Changelog: https://github.com/Hancapo/rwfury/compare/v0.6.0...v0.6.1
 
 ## [0.6.0] - 2026-08-01
 
