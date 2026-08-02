@@ -23,6 +23,7 @@ Python library for reading and writing GTA RenderWare **DFF** (3D model), **TXD*
 ### Export and authoring
 
 - **Generic mesh export**: `GenericMesh` output with flat arrays and byte-packing helpers for glTF, FBX, or custom pipelines
+- **Generic animation export**: source-ordered clips, tracks, keyframes, and typed channel buffers with no target-format dependency
 - **BinMesh-aware export**: `to_generic_meshes()` preserves material splits and triangle strips
 - **Named collision materials**: `ColMaterial` enum for readable collision surface IDs
 
@@ -306,7 +307,12 @@ obj = ifp.get_object("ARRESTgun", "Root")
 
 print(len(anim.objects), int(obj.frame_type), len(obj.frames))
 
-json_text = ifp.to_animation_json()
+# Convert in memory without JSON or a target-format dependency.
+generic = ifp.to_generic_animation_set()
+clip = generic.get_animation("ARRESTgun")
+for track in clip.tracks:
+    buffers = track.to_buffers("f32")
+    print(track.name, track.bone_id, buffers.keyframe_count)
 
 # Validate without preventing recovery of structurally readable tracks.
 for issue in ifp.validate():
@@ -319,7 +325,7 @@ for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
         print(track.name, frame.to_matrix())
 ```
 
-`ANPK` packages use the same API and retain `KR00`, `KRT0`, and `KRTS` data, including scale tracks and opaque metadata needed for lossless rewriting.
+`ANPK` packages use the same API and retain `KR00`, `KRT0`, and `KRTS` data, including scale tracks and opaque metadata needed for lossless rewriting. Generic conversion preserves clip, track, and keyframe order; duplicate names; bone IDs; original timestamps; compressed `raw_time`; non-finite values; and the distinction between absent and present translation/scale channels. Use `iter_generic_animations()` to convert large packages one clip at a time.
 
 ## API reference
 
@@ -335,9 +341,14 @@ for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
 | `Col` | COL parser/writer. `from_file(path)`, `from_bytes(data)`, `to_file(path)`, `to_bytes()` |
 | `ColModel` | One collision model with bounds, primitives, mesh, face groups, and optional shadow mesh |
 | `ColMaterial` | Named `IntEnum` for COL surface material IDs |
-| `Ifp` | ANP3/ANPK parser and writer with lookup, validation, JSON export, duration, sampling, and transform evaluation |
+| `Ifp` | ANP3/ANPK parser and writer with lookup, validation, generic animation conversion, duration, sampling, and transform evaluation |
 | `SaPaths` / `SaPathFile` | GTA SA native/Fastman92 path parser/writer with section-aware helpers |
 | `GenericMesh` | Flat-array mesh with `*_as_bytes()` helpers for format-agnostic export |
+| `GenericAnimationSet` | In-memory animation package with source format and coordinate conventions |
+| `GenericAnimation` | Named clip with source-ordered tracks and duplicate-safe lookup |
+| `GenericAnimationTrack` | Flat time/rotation/translation/scale channels and portable binary buffers |
+| `GenericAnimationKeyframe` | Indexed view of one source keyframe without fabricated channels |
+| `GenericAnimationBuffers` | Deinterleaved `f32`/`f64` channel bytes in little- or big-endian order |
 
 ### DFF data classes
 
@@ -397,6 +408,19 @@ for track, frame in ifp.sample_animation("ARRESTgun", 1.0):
 | `indices_as_bytes(fmt)` | `"u16"` or `"u32"` packed indices |
 | `bone_indices_as_bytes()` | Packed `uint8` (4 bytes/vertex) |
 | `bone_weights_as_bytes()` | Packed `float32` LE (16 bytes/vertex) |
+
+### Generic animation properties and methods
+
+| Member | Description |
+|--------|-------------|
+| `Ifp.iter_generic_animations()` | Lazily convert one clip at a time |
+| `Ifp.to_generic_animations()` | Return independent generic clips in source order |
+| `Ifp.to_generic_animation_set()` | Return the complete package and source conventions in memory |
+| `times`, `rotations` | Flat source-ordered time and quaternion (`xyzw`) arrays |
+| `translations`, `scales` | Flat XYZ arrays, or `None` when the source channel is absent |
+| `raw_times` | Original compressed time ticks when available |
+| `iter_keyframes()` | Iterate indexed keyframe views without changing source order |
+| `to_buffers(fmt, byte_order)` | Pack deinterleaved channels as `f32` or `f64`, little- or big-endian |
 
 ## Supported formats
 

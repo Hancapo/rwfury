@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
+from . import generic_export
 from .models import IfpAnimation, IfpFrame, IfpObject, IfpOutOfRange
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from ..generic_animation import GenericAnimation, GenericAnimationSet
 
 
 class IfpPackageApi:
@@ -66,6 +69,26 @@ class IfpPackageApi:
         if animation is None:
             raise KeyError(f"Animation not found: {name}")
         return animation.sample(time, out_of_range=out_of_range)
+
+    def iter_generic_animations(self) -> Iterator[GenericAnimation]:
+        """Yield format-neutral clips without converting the whole package."""
+        return generic_export.iter_generic_animations(self)
+
+    def to_generic_animations(self) -> list[GenericAnimation]:
+        """Return every clip as an independent format-neutral object."""
+        return list(self.iter_generic_animations())
+
+    def get_generic_animation(self, name: str) -> GenericAnimation | None:
+        """Return the first case-insensitive generic clip match."""
+        name_lower = name.lower()
+        for animation in self.iter_generic_animations():
+            if animation.name.lower() == name_lower:
+                return animation
+        return None
+
+    def to_generic_animation_set(self) -> GenericAnimationSet:
+        """Convert the package to a self-contained in-memory animation set."""
+        return generic_export.to_generic_animation_set(self)
 
     def to_animation_data(self) -> dict:
         animations = []
