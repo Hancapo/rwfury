@@ -15,6 +15,8 @@ from .img import Img, ImgEntry
 from .ifp import (
     Ifp, IfpAnimation, IfpObject, IfpFrame,
     IfpVersion, IfpFrameType, IfpKeyframeType,
+    IfpValidationIssue, IfpValidationError,
+    IfpOutOfRange,
 )
 from .col import Col, ColModel, ColSphere, ColBox, ColFace, ColBounds, ColSurface, ColFaceGroup
 from .col_materials import ColMaterial
@@ -38,6 +40,8 @@ __all__ = [
     "Img", "ImgEntry",
     "Ifp", "IfpAnimation", "IfpObject", "IfpFrame",
     "IfpVersion", "IfpFrameType", "IfpKeyframeType",
+    "IfpValidationIssue", "IfpValidationError",
+    "IfpOutOfRange",
     "Col", "ColModel", "ColSphere", "ColBox", "ColFace",
     "ColBounds", "ColSurface", "ColFaceGroup", "ColMaterial",
     "SaPathFile", "SaPaths", "PathNode", "NaviNode", "PathLink", "NaviLink",
